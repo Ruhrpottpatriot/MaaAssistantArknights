@@ -4,3 +4,6 @@ members = [
     "maa-rs",
     "maa-rs_sys"
 ]
+
+[workspace.dependencies]
+thiserror = "1.0"
