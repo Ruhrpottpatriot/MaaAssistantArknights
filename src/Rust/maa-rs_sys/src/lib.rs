@@ -624,7 +624,7 @@ impl Assistant {
         // The AsstMsgId is just a typedef, but we have a newtype
         let i = MessageType(i);
 
-        callback(i, &rust_str);
+        callback(i, rust_str);
     }
 }
 
@@ -634,12 +634,15 @@ impl Drop for Assistant {
             return;
         }
 
-        // Safety: The handle is never null at this point
+        // Safety: The handle is never null at this point. The same goes for the callback
+        // pointer, which we want to get back from a raw pointer so it can be sasfely
+        // dropped and the memory doesn't leak.
+        #[allow(clippy::multiple_unsafe_ops_per_block)]
         unsafe {
             AsstDestroy(self.handle);
 
             if let Some(callback_ptr) = self.callback_ptr {
-                Box::from_raw(callback_ptr);
+                let _ = Box::from_raw(callback_ptr);
             }
         }
     }
