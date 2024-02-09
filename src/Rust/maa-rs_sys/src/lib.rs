@@ -8,6 +8,14 @@
     clippy::undocumented_unsafe_blocks
 )]
 
+/// This module just includes the bindings file, so we can control the visibility of said
+/// bindings and not have them pollute the public namespace of the crate. The reason for
+/// this is rust-bindgen's way of generating C-bindings, which are *pub* by default. Since
+/// this could potentially leak unsafe types, we have to make sure that none of those
+/// appear in the public API of this crate.
+pub(crate) mod bind;
+use bind::*;
+
 use std::{
     collections::{HashMap, HashSet},
     ffi::{c_char, c_int, c_void, CStr, CString, NulError},
