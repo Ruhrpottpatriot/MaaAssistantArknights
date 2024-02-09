@@ -1,6 +1,9 @@
+#![allow(dead_code)]
+#![warn(clippy::missing_safety_doc)]
+
 use std::{
     collections::{HashMap, HashSet},
-    ffi::c_void,
+    ffi::{c_char, c_int, c_void, CStr, CString, NulError},
 };
 
 include!("./maa_sys/bind.rs");
@@ -13,8 +16,8 @@ pub enum Error {
     Utf8,
 }
 
-impl From<std::ffi::NulError> for Error {
-    fn from(_: std::ffi::NulError) -> Self {
+impl From<NulError> for Error {
+    fn from(_: NulError) -> Self {
         Self::Null
     }
 }
@@ -40,311 +43,397 @@ pub struct Maa {
 }
 
 impl Maa {
-    #[allow(dead_code)]
+    /// Create a new Maa instance
     pub fn new() -> Self {
-        unsafe {
-            Maa {
-                handle: AsstCreate(),
-                uuid: None,
-                target: None,
-                tasks: HashMap::new(),
-            }
+        let handle = unsafe { AsstCreate() };
+        Maa {
+            handle,
+            uuid: None,
+            target: None,
+            tasks: HashMap::new(),
         }
     }
+
     pub fn get_null_size() -> u64 {
         unsafe { AsstGetNullSize() }
     }
+
     pub fn with_callback_and_custom_arg(
-        call_back: AsstApiCallback,
-        custom_arg: *mut std::os::raw::c_void,
+        callback: AsstApiCallback,
+        custom_arg: *mut c_void,
     ) -> Self {
-        unsafe {
-            Maa {
-                handle: AsstCreateEx(call_back, custom_arg),
-                uuid: None,
-                target: None,
-                tasks: HashMap::new(),
-            }
+        let handle = unsafe { AsstCreateEx(callback, custom_arg) };
+        Maa {
+            handle,
+            uuid: None,
+            target: None,
+            tasks: HashMap::new(),
         }
     }
-    #[allow(dead_code)]
-    pub fn with_callback(call_back: AsstApiCallback) -> Self {
-        Self::with_callback_and_custom_arg(call_back, std::ptr::null_mut::<std::os::raw::c_void>())
+
+    pub fn with_callback(callback: AsstApiCallback) -> Self {
+        Self::with_callback_and_custom_arg(callback, std::ptr::null_mut::<c_void>())
     }
-    #[allow(dead_code)]
+
+    /// The default callback function that just prints the message and the detail json
     pub unsafe extern "C" fn default_callback(
-        msg: std::os::raw::c_int,
-        detail_json: *const ::std::os::raw::c_char,
-        _: *mut ::std::os::raw::c_void,
+        msg: c_int,
+        detail_json: *const c_char,
+        _: *mut c_void,
     ) {
         println!(
             "msg:{}: {}",
             msg,
-            std::ffi::CStr::from_ptr(detail_json)
-                .to_str()
-                .unwrap()
+            CStr::from_ptr(detail_json).to_str().unwrap()
         );
     }
+
     pub fn load_resource(path: &str) -> Result<(), Error> {
-        let ret: AsstBool;
-        unsafe {
-            let path = std::ffi::CString::new(path.to_string())?;
-            ret = AsstLoadResource(path.as_ptr());
+        let path = CString::new(path.to_string())?;
+
+        let return_code = unsafe {
+            AsstLoadResource(path.as_ptr())
         };
-        match ret {
+        match return_code {
             1 => Ok(()),
             _ => Err(Error::Unknown),
         }
     }
+
+    /// Gets the current version of the MAA library
     pub fn get_version() -> Result<String, Error> {
-        unsafe {
-            let c = AsstGetVersion();
-            let ret = std::ffi::CStr::from_ptr(c).to_str()?.to_string();
-            Ok(ret)
-        }
+        let version = unsafe {
+            let version = AsstGetVersion();
+            CStr::from_ptr(version)
+        };
+
+        // Throw an error instead of replacing invalid utf8 characters
+        // TODO: Return a reference instead of a cloned string
+        // TODO: The returned version is should be a SemVer  struct
+        Ok(version.to_str()?.to_string())
     }
-    #[allow(dead_code)]
+
     pub fn set_static_option(option: AsstStaticOptionKey, value: &str) -> Result<(), Error> {
-        let c_option_value = std::ffi::CString::new(value)?;
-        unsafe {
-            if AsstSetStaticOption(option, c_option_value.as_ptr()) == 1 {
-                Ok(())
-            } else {
-                Err(Error::Unknown)
-            }
+        let c_option_value = CString::new(value)?;
+
+        let return_code = unsafe { AsstSetStaticOption(option, c_option_value.as_ptr()) };
+        if return_code == 1 {
+            Ok(())
+        } else {
+            Err(Error::Unknown)
         }
     }
-    #[allow(dead_code)]
+
     pub fn set_working_directory(path: &str) -> Result<(), Error> {
-        let c_path = std::ffi::CString::new(path)?;
-        unsafe {
-            if AsstSetUserDir(c_path.as_ptr()) == 1 {
-                Ok(())
-            } else {
-                Err(Error::Unknown)
-            }
+        let c_path = CString::new(path)?;
+
+        let return_code = unsafe { AsstSetUserDir(c_path.as_ptr()) };
+        if return_code == 1 {
+            Ok(())
+        } else {
+            Err(Error::Unknown)
         }
     }
-    #[allow(dead_code)]
+
     pub fn set_option(&mut self, option: AsstInstanceOptionKey, value: &str) -> Result<(), Error> {
-        let c_option_value = std::ffi::CString::new(value)?;
-        unsafe {
-            if AsstSetInstanceOption(self.handle, option, c_option_value.as_ptr()) == 1 {
-                Ok(())
-            } else {
-                Err(Error::Unknown)
-            }
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let c_option_value = CString::new(value)?;
+
+        let return_code =
+            unsafe { AsstSetInstanceOption(self.handle, option, c_option_value.as_ptr()) };
+        if return_code == 1 {
+            Ok(())
+        } else {
+            Err(Error::Unknown)
         }
     }
+
     pub fn connect(
         &mut self,
         adb_path: &str,
         address: &str,
         config: Option<&str>,
     ) -> Result<i32, Error> {
-        unsafe {
-            let c_adb_path = std::ffi::CString::new(adb_path)?;
-            let c_address = std::ffi::CString::new(address)?;
-            let c_cfg_ptr = match config {
-                Some(cfg) => std::ffi::CString::new(cfg)?.as_ptr(),
-                None => std::ptr::null::<std::os::raw::c_char>(),
-            };
-            let ret = AsstAsyncConnect(
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let c_adb_path = CString::new(adb_path)?;
+        let c_address = CString::new(address)?;
+        let c_cfg_ptr = match config {
+            Some(cfg) => CString::new(cfg)?.as_ptr(),
+            None => std::ptr::null::<c_char>(),
+        };
+
+        let return_code = unsafe {
+            AsstAsyncConnect(
                 self.handle,
                 c_adb_path.as_ptr(),
                 c_address.as_ptr(),
                 c_cfg_ptr,
                 1,
-            );
-            if ret != 0 {
-                self.target = Some(address.to_string());
-                Ok(ret)
-            } else {
-                Err(Error::Unknown)
-            }
+            )
+        };
+        if return_code != 0 {
+            self.target = Some(address.to_string());
+            Ok(return_code)
+        } else {
+            Err(Error::Unknown)
         }
     }
 
     #[deprecated]
-    #[allow(dead_code)]
     pub fn connect_legacy(
         &mut self,
         adb_path: &str,
         address: &str,
         config: Option<&str>,
     ) -> Result<(), Error> {
-        let c_adb_path = std::ffi::CString::new(adb_path)?;
-        let c_address = std::ffi::CString::new(address)?;
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let c_adb_path = CString::new(adb_path)?;
+        let c_address = CString::new(address)?;
         let c_cfg_ptr = match config {
-            Some(cfg) => std::ffi::CString::new(cfg)?.as_ptr(),
-            None => std::ptr::null::<std::os::raw::c_char>(),
+            Some(cfg) => CString::new(cfg)?.as_ptr(),
+            None => std::ptr::null::<c_char>(),
         };
-        unsafe {
-            let ret = AsstConnect(
+
+        let return_code = unsafe {
+            AsstConnect(
                 self.handle,
                 c_adb_path.as_ptr(),
                 c_address.as_ptr(),
                 c_cfg_ptr,
-            );
-            if ret == 1 {
-                Ok(())
-            } else {
-                Err(Error::Unknown)
-            }
+            )
+        };
+        if return_code == 1 {
+            Ok(())
+        } else {
+            Err(Error::Unknown)
         }
     }
-    #[allow(dead_code)]
+
+    /// Check if an instance of MAA is running
+    ///
+    /// # Safety
+    /// This function checks if the handle stored inside `self` is not null. If the handle
+    /// is null, the function will return false.
     pub fn running(&self) -> bool {
+        if self.handle.is_null() {
+            return false;
+        }
+
         unsafe { AsstRunning(self.handle) == 1 }
     }
+
     pub fn click(&self, x: i32, y: i32) -> Result<i32, Error> {
-        unsafe {
-            let ret = AsstAsyncClick(self.handle, x, y, 0);
-            if ret != 0 {
-                Ok(ret)
-            } else {
-                Err(Error::Unknown)
-            }
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let return_code = unsafe { AsstAsyncClick(self.handle, x, y, 0) };
+        if return_code != 0 {
+            Ok(return_code)
+        } else {
+            Err(Error::Unknown)
         }
     }
+
     pub fn screenshot(&self) -> Result<Vec<u8>, Error> {
-        unsafe {
-            let mut buff_size = 2 * 1920 * 1080 * 4;
-            loop {
-                if buff_size > 10 * 1920 * 1080 * 4 {
-                    return Err(Error::TooLargeAlloc);
-                }
-                let mut buff: Vec<u8> = Vec::with_capacity(buff_size);
-                let data_size = AsstGetImage(
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let mut buff_size = 2 * 1920 * 1080 * 4;
+        loop {
+            if buff_size > 10 * 1920 * 1080 * 4 {
+                return Err(Error::TooLargeAlloc);
+            }
+            let mut buff: Vec<u8> = Vec::with_capacity(buff_size);
+            let data_size = unsafe {
+                AsstGetImage(
                     self.handle,
                     buff.as_mut_ptr() as *mut c_void,
                     buff_size as u64,
-                );
-                if data_size == Self::get_null_size() {
-                    buff_size *= 2;
-                    continue;
-                }
-                buff.set_len(data_size as usize);
-                buff.resize(data_size as usize, 0);
-                return Ok(buff);
+                )
+            };
+            if data_size == Self::get_null_size() {
+                buff_size *= 2;
+                continue;
             }
+
+            unsafe { buff.set_len(data_size as usize) };
+            buff.resize(data_size as usize, 0);
+            return Ok(buff);
         }
     }
-    #[allow(dead_code)]
+
     pub fn take_screenshot(&mut self) -> Result<(), Error> {
-        unsafe {
-            match AsstAsyncScreencap(self.handle, 1) {
-                0 => Err(Error::Unknown),
-                _ => Ok(()),
-            }
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let return_code = unsafe { AsstAsyncScreencap(self.handle, 1) };
+        match return_code {
+            0 => Err(Error::Unknown),
+            _ => Ok(()),
         }
     }
+
     pub fn create_task(&mut self, type_: &str, params: &str) -> Result<AsstTaskId, Error> {
-        unsafe {
-            let c_type = std::ffi::CString::new(type_)?;
-            let c_params = std::ffi::CString::new(params)?;
-            let task_id = AsstAppendTask(self.handle, c_type.as_ptr(), c_params.as_ptr());
-            self.tasks.insert(
-                task_id,
-                Task {
-                    id: task_id,
-                    type_: type_.to_string(),
-                    params: params.to_string(),
-                },
-            );
-            Ok(task_id)
+        if self.handle.is_null() {
+            return Err(Error::Null);
         }
+
+        let c_type = CString::new(type_)?;
+        let c_params = CString::new(params)?;
+
+        let task_id = unsafe { AsstAppendTask(self.handle, c_type.as_ptr(), c_params.as_ptr()) };
+        self.tasks.insert(
+            task_id,
+            Task {
+                id: task_id,
+                type_: type_.to_string(),
+                params: params.to_string(),
+            },
+        );
+
+        Ok(task_id)
     }
+
     pub fn set_task(&self, id: i32, params: &str) -> Result<(), Error> {
-        unsafe {
-            let c_params = std::ffi::CString::new(params)?;
-            match AsstSetTaskParams(self.handle, id, c_params.as_ptr()) {
-                1 => Ok(()),
-                _ => Err(Error::Unknown),
-            }
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let c_params = CString::new(params)?;
+
+        let return_code = unsafe { AsstSetTaskParams(self.handle, id, c_params.as_ptr()) };
+        match return_code {
+            1 => Ok(()),
+            _ => Err(Error::Unknown),
         }
     }
+
     pub fn get_uuid(&mut self) -> Result<String, Error> {
         if let Some(uuid) = self.uuid.clone() {
             return Ok(uuid);
         };
-        unsafe {
-            let mut buff_size = 1024;
-            loop {
-                if buff_size > 1024 * 1024 {
-                    return Err(Error::TooLargeAlloc);
-                }
-                let mut buff: Vec<u8> = Vec::with_capacity(buff_size);
-                let data_size =
-                    AsstGetUUID(self.handle, buff.as_mut_ptr() as *mut i8, buff_size as u64);
-                if data_size == Self::get_null_size() {
-                    buff_size *= 2;
-                    continue;
-                }
-                buff.set_len(data_size as usize);
-                let ret = String::from_utf8_lossy(&buff).to_string();
-                self.uuid = Some(ret.clone());
-                return Ok(ret);
+
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let mut buff_size = 1024;
+        loop {
+            if buff_size > 1024 * 1024 {
+                return Err(Error::TooLargeAlloc);
             }
+            let mut buff: Vec<u8> = Vec::with_capacity(buff_size);
+            let data_size =
+                unsafe { AsstGetUUID(self.handle, buff.as_mut_ptr() as *mut i8, buff_size as u64) };
+            if data_size == Self::get_null_size() {
+                buff_size *= 2;
+                continue;
+            }
+            unsafe { buff.set_len(data_size as usize) };
+            let ret = String::from_utf8_lossy(&buff).to_string();
+            self.uuid = Some(ret.clone());
+            return Ok(ret);
         }
     }
+
     pub fn get_target(&self) -> Option<String> {
+        // TODO: Give out a reference
         self.target.clone()
     }
+
+    /// Gets a list of tasks that are currently configured
     pub fn get_tasks(&mut self) -> Result<&HashMap<i32, Task>, Error> {
-        unsafe {
-            let mut buff_size = 1024;
-            loop {
-                if buff_size > 1024 * 1024 {
-                    return Err(Error::TooLargeAlloc);
-                }
-                let mut buff: Vec<i32> = Vec::with_capacity(buff_size);
-                let data_size =
-                    AsstGetTasksList(self.handle, buff.as_mut_ptr(), buff_size as u64);
-                if data_size == Self::get_null_size() {
-                    buff_size *= 2;
-                    continue;
-                }
-                buff.set_len(data_size as usize);
-                buff.resize(data_size as usize, 0);
-                let mut task_ids = HashSet::with_capacity(buff.len());
-                for i in buff {
-                    task_ids.insert(i);
-                }
-                self.tasks.retain(|k, _| task_ids.contains(k));
-                return Ok(&self.tasks);
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let mut buff_size = 1024;
+        loop {
+            if buff_size > 1024 * 1024 {
+                return Err(Error::TooLargeAlloc);
             }
+            let mut buff: Vec<i32> = Vec::with_capacity(buff_size);
+            let data_size =
+                unsafe { AsstGetTasksList(self.handle, buff.as_mut_ptr(), buff_size as u64) };
+
+            if data_size == Self::get_null_size() {
+                buff_size *= 2;
+                continue;
+            }
+
+            unsafe { buff.set_len(data_size as usize) };
+
+            buff.resize(data_size as usize, 0);
+
+            let mut task_ids = HashSet::with_capacity(buff.len());
+
+            for i in buff {
+                task_ids.insert(i);
+            }
+
+            self.tasks.retain(|k, _| task_ids.contains(k));
+
+            return Ok(&self.tasks);
         }
     }
+
+    /// Starts the configured tasks
     pub fn start(&self) -> Result<(), Error> {
-        unsafe {
-            match AsstStart(self.handle) {
-                1 => Ok(()),
-                _ => Err(Error::Unknown),
-            }
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let return_code = unsafe { AsstStart(self.handle) };
+        match return_code {
+            1 => Ok(()),
+            _ => Err(Error::Unknown),
         }
     }
+
+    /// Stops the configured tasks
     pub fn stop(&self) -> Result<(), Error> {
-        unsafe {
-            match AsstStop(self.handle) {
-                1 => Ok(()),
-                _ => Err(Error::Unknown),
-            }
+        if self.handle.is_null() {
+            return Err(Error::Null);
+        }
+
+        let return_code = unsafe { AsstStop(self.handle) };
+        match return_code {
+            1 => Ok(()),
+            _ => Err(Error::Unknown),
         }
     }
-    #[allow(dead_code)]
+
+    /// Passes the given log message to the underlying MAA instance
     pub fn log(level_str: &str, message: &str) -> Result<(), Error> {
-        let c_level_str = std::ffi::CString::new(level_str)?;
-        let c_message = std::ffi::CString::new(message)?;
+        let c_level_str = CString::new(level_str)?;
+        let c_message = CString::new(message)?;
+
         unsafe {
             AsstLog(c_level_str.as_ptr(), c_message.as_ptr());
         }
+
         Ok(())
     }
 }
 
 impl Drop for Maa {
     fn drop(&mut self) {
+        if self.handle.is_null() {
+            return;
+        }
+
         unsafe { AsstDestroy(self.handle) }
     }
 }
