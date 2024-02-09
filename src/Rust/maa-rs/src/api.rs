@@ -1,12 +1,12 @@
 use crate::database;
-use maa_rs_sys::{self, Maa};
+use maa_rs_sys::{self, Assistant};
 
 use actix_web::{
     http::{header::ContentType, StatusCode},
     web, HttpResponse,
 };
 use serde_json::json;
-use std::{collections::HashMap, ffi::c_void, sync::PoisonError};
+use std::{collections::HashMap, sync::PoisonError};
 
 mod connect;
 mod device;
@@ -84,7 +84,7 @@ impl actix_web::error::ResponseError for Error {
 pub type ManagerData = web::Data<std::sync::Mutex<MaaManager>>;
 
 pub struct MaaManager {
-    pub instances: HashMap<i64, Maa>,
+    pub instances: HashMap<i64, Assistant>,
     id: i64,
 }
 
@@ -97,25 +97,21 @@ impl MaaManager {
     }
     pub fn create(&mut self) -> i64 {
         let id = self.gen_id();
-        let maa = Maa::new_with_callback_and_args(
-            Some(database::maa_store_callback),
-            id as *mut c_void,
-        )
-        .unwrap();
+        let maa = Assistant::new(Some(database::maa_store_callback)).unwrap();
         self.instances.insert(id, maa);
         id
     }
-    pub fn get(&self, id: i64) -> Option<&Maa> {
+    pub fn get(&self, id: i64) -> Option<&Assistant> {
         self.instances.get(&id)
     }
-    pub fn get_mut(&mut self, id: i64) -> Option<&mut Maa> {
+    pub fn get_mut(&mut self, id: i64) -> Option<&mut Assistant> {
         self.instances.get_mut(&id)
     }
     pub fn get_target(&self, id: i64) -> Option<String> {
         let maa = self.get(id)?;
         maa.get_target()
     }
-    pub fn delete(&mut self, id: i64) -> Option<Maa> {
+    pub fn delete(&mut self, id: i64) -> Option<Assistant> {
         self.instances.remove(&id)
     }
     pub fn get_all_id(&self) -> Vec<i64> {

@@ -6,13 +6,13 @@ mod database;
 
 use actix_web::{middleware, rt, web, App, HttpServer};
 use config::CONFIG;
-use maa_rs_sys::Maa;
+use maa_rs_sys::Assistant;
 use std::{error::Error, sync::Mutex};
 
 
 
 fn main() -> Result<(), Box<dyn Error>> {
-    Maa::load_resource(&CONFIG.resource.path).unwrap();
+    Assistant::load_resource(&CONFIG.resource.path).unwrap();
 
     if CONFIG.database.drop_on_start_up {
         database::drop_all().unwrap();

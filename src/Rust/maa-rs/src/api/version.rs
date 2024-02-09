@@ -1,6 +1,6 @@
 use super::Error;
 use actix_web::{get, web, HttpResponse, Responder};
-use maa_rs_sys::Maa;
+use maa_rs_sys::Assistant;
 use serde::Serialize;
 use serde_json::json;
 
@@ -63,7 +63,7 @@ pub async fn version() -> Result<impl Responder, Error> {
     };
     // TODO: Get the version for the FFI crate
 
-    let core = Maa::get_version()?;
+    let core = Assistant::get_version()?;
 
     Ok(HttpResponse::Ok().json(json!({
         "core": core,

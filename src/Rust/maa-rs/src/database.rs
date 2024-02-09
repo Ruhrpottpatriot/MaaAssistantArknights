@@ -1,9 +1,10 @@
 use crate::CONFIG;
 use lazy_static::lazy_static;
+use maa_rs_sys::MessageType;
 use serde_json::Value;
 use std::{
-    ffi::{c_char, c_int, c_void, CStr},
-    path::PathBuf, string::FromUtf8Error,
+    path::PathBuf,
+    string::FromUtf8Error,
 };
 
 lazy_static! {
@@ -17,7 +18,7 @@ lazy_static! {
 
 #[derive(Debug)]
 pub enum Error {
-    /// Occurs when a database operation failed 
+    /// Occurs when a database operation failed
     Sled(sled::Error),
 
     /// Occurs when serde couldn't deserialize the json message string
@@ -52,11 +53,10 @@ impl From<FromUtf8Error> for Error {
 #[derive(Debug)]
 pub struct Msg {
     pub time: i64,
-    pub type_: u32,
+    pub type_: MessageType,
     pub uuid: String,
     pub body: String,
 }
-
 
 impl Msg {
     /// Converts a [`sled::IVec`] to a [`Msg`] struct
@@ -76,7 +76,8 @@ impl Msg {
         // Take the 9th to 12th byte and convert them into the message type
         let type_ = {
             let tmp: [u8; 4] = [ivec[8], ivec[9], ivec[10], ivec[11]];
-            u32::from_be_bytes(tmp)
+            let id = i32::from_be_bytes(tmp);
+            MessageType::new(id)
         };
 
         // Take the rest of the bytes and convert them into the json based message body
@@ -92,10 +93,10 @@ impl Msg {
 }
 
 /// Inserts a message into the appropriate tree
-/// 
+///
 /// # Parameters
 /// * `msg` - The message to insert
-/// 
+///
 /// # Returns
 /// The id of the inserted message
 pub fn insert_msg(msg: &Msg) -> Result<u64, Error> {
@@ -109,11 +110,11 @@ pub fn insert_msg(msg: &Msg) -> Result<u64, Error> {
 }
 
 /// Gets a message with the given id from the specified tree
-/// 
+///
 /// # Parameters
 /// * `uuid` - The database tree in which the message is stored
 /// * `id` - The id of the message
-/// 
+///
 /// # Returns
 /// The message with the given id; `None` if no message with the given id exists.
 pub fn get_msg(uuid: &str, id: u64) -> Result<Option<Msg>, Error> {
@@ -128,7 +129,7 @@ pub fn get_msg(uuid: &str, id: u64) -> Result<Option<Msg>, Error> {
 }
 
 /// Gets the ids for all trees in the database
-/// 
+///
 /// # Returns
 /// A vector of all trees currently in the database
 pub fn get_all_uuid() -> Result<Vec<String>, Error> {
@@ -144,7 +145,7 @@ pub fn get_all_uuid() -> Result<Vec<String>, Error> {
 }
 
 /// Gets the last `n` messages that were stored in the database
-/// 
+///
 /// # Parameters
 /// * `uuid` - The database tree in which the messages are stored
 /// * `nums` - The number of messages to retrieve
@@ -167,7 +168,7 @@ pub fn get_last_msg(uuid: &str, nums: usize) -> Result<Vec<Msg>, Error> {
 }
 
 /// Drops a single tree from the database and deletes all associeated data
-/// 
+///
 /// # Parameters
 /// * `uuid` - The id of the message
 pub fn drop(uuid: &str) -> Result<(), Error> {
@@ -188,20 +189,11 @@ pub fn drop_all() -> Result<(), Error> {
 /// # Parameters
 /// * `msg` - The type of the message
 /// * `detail_json` - The formatted as json
-/// * `id` - The id of the message
-#[allow(unused_variables)]
-pub unsafe extern "C" fn maa_store_callback(
-    msg: c_int,
-    detail_json: *const c_char,
-    id: *mut c_void,
-) {
+pub fn maa_store_callback(msg: MessageType, detail_json: &str) {
     // NOTE: Using uwrap is fine here, as any panic caused by it will be siltenly captured
     // by the catch_unwind @and ignored. That way we don't propagate errors back to the caller.
     _ = std::panic::catch_unwind(|| {
-        let body = CStr::from_ptr(detail_json)
-            .to_str()
-            .map(|s| s.to_string())
-            .unwrap();
+        let body = detail_json.to_string();
 
         let now = chrono::Local::now().timestamp_millis();
 
@@ -215,7 +207,7 @@ pub unsafe extern "C" fn maa_store_callback(
 
         let msg = Msg {
             time: now,
-            type_: msg as u32,
+            type_: msg,
             uuid,
             body,
         };
