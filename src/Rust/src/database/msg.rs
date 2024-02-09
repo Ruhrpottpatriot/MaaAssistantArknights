@@ -110,7 +110,7 @@ pub fn get_last_msg(uuid: &str, nums: usize) -> Result<Vec<Msg>, Error> {
             _ => break,
         }
     }
-    return Ok(result);
+    Ok(result)
 }
 pub fn drop(uuid: &str) -> Result<(), Error> {
     MSG_DB.drop_tree(uuid)?;
@@ -143,7 +143,7 @@ pub unsafe extern "C" fn maa_store_callback(
                         time: now,
                         type_: msg as u32,
                         uuid: uuid.to_string(),
-                        body: body,
+                        body,
                     };
                     insert_msg(&msg).unwrap();
                 }

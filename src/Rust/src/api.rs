@@ -58,9 +58,7 @@ impl actix_web::error::ResponseError for Error {
             .json(body)
     }
     fn status_code(&self) -> StatusCode {
-        match self {
-            _ => StatusCode::OK,
-        }
+        StatusCode::OK
     }
 }
  
@@ -93,15 +91,15 @@ impl MaaManager {
         maa.get_target() 
     }
     pub fn delete(&mut self, id:i64)->Option<Maa>{
-        let maa = self.instances.remove(&id);
-        maa
+        
+        self.instances.remove(&id)
     }
     pub fn get_all_id(&self)->Vec<i64>{
-        self.instances.keys().map(|x|*x).collect()
+        self.instances.keys().copied().collect()
     }
     pub fn gen_id(&mut self)->i64{
-        self.id = self.id +1;
-        return self.id
+        self.id += 1;
+        self.id
     }
 }
 unsafe impl Send for MaaManager{}

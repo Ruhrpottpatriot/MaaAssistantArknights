@@ -69,7 +69,7 @@ impl Maa {
     }
     #[allow(dead_code)]
     pub fn with_callback(call_back: AsstApiCallback) -> Self {
-        Self::with_callback_and_custom_arg(call_back, 0 as *mut std::os::raw::c_void)
+        Self::with_callback_and_custom_arg(call_back, std::ptr::null_mut::<std::os::raw::c_void>())
     }
     #[allow(dead_code)]
     pub unsafe extern "C" fn default_callback(
@@ -83,7 +83,6 @@ impl Maa {
             std::ffi::CStr::from_ptr(detail_json)
                 .to_str()
                 .unwrap()
-                .to_string()
         );
     }
     pub fn load_resource(path: &str) -> Result<(), Error> {
@@ -148,7 +147,7 @@ impl Maa {
             let c_address = std::ffi::CString::new(address)?;
             let c_cfg_ptr = match config {
                 Some(cfg) => std::ffi::CString::new(cfg)?.as_ptr(),
-                None => 0 as *const std::os::raw::c_char,
+                None => std::ptr::null::<std::os::raw::c_char>(),
             };
             let ret = AsstAsyncConnect(
                 self.handle,
@@ -178,7 +177,7 @@ impl Maa {
         let c_address = std::ffi::CString::new(address)?;
         let c_cfg_ptr = match config {
             Some(cfg) => std::ffi::CString::new(cfg)?.as_ptr(),
-            None => 0 as *const std::os::raw::c_char,
+            None => std::ptr::null::<std::os::raw::c_char>(),
         };
         unsafe {
             let ret = AsstConnect(
@@ -222,7 +221,7 @@ impl Maa {
                     buff_size as u64,
                 );
                 if data_size == Self::get_null_size() {
-                    buff_size = 2 * buff_size;
+                    buff_size *= 2;
                     continue;
                 }
                 buff.set_len(data_size as usize);
@@ -279,7 +278,7 @@ impl Maa {
                 let data_size =
                     AsstGetUUID(self.handle, buff.as_mut_ptr() as *mut i8, buff_size as u64);
                 if data_size == Self::get_null_size() {
-                    buff_size = 2 * buff_size;
+                    buff_size *= 2;
                     continue;
                 }
                 buff.set_len(data_size as usize);
@@ -290,7 +289,7 @@ impl Maa {
         }
     }
     pub fn get_target(&self) -> Option<String> {
-        return self.target.clone();
+        self.target.clone()
     }
     pub fn get_tasks(&mut self) -> Result<&HashMap<i32, Task>, Error> {
         unsafe {
@@ -301,9 +300,9 @@ impl Maa {
                 }
                 let mut buff: Vec<i32> = Vec::with_capacity(buff_size);
                 let data_size =
-                    AsstGetTasksList(self.handle, buff.as_mut_ptr() as *mut i32, buff_size as u64);
+                    AsstGetTasksList(self.handle, buff.as_mut_ptr(), buff_size as u64);
                 if data_size == Self::get_null_size() {
-                    buff_size = 2 * buff_size;
+                    buff_size *= 2;
                     continue;
                 }
                 buff.set_len(data_size as usize);
