@@ -97,10 +97,11 @@ impl MaaManager {
     }
     pub fn create(&mut self) -> i64 {
         let id = self.gen_id();
-        let maa = Maa::with_callback_and_custom_arg(
+        let maa = Maa::new_with_callback_and_args(
             Some(database::maa_store_callback),
             id as *mut c_void,
-        );
+        )
+        .unwrap();
         self.instances.insert(id, maa);
         id
     }

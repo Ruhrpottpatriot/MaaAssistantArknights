@@ -57,37 +57,63 @@ pub struct Maa {
 }
 
 impl Maa {
-    /// Create a new Maa instance
-    pub fn new() -> Self {
+    /// Create a new MAA instance
+    pub fn new() -> Result<Self> {
+        // Safety: This allocation might return a null pointer, for which we're
+        // going to check directly after and return an error to the caller.
         let handle = unsafe { AsstCreate() };
+        if handle.is_null() {
+            return Err(Error::AllocFailed);
+        }
 
-        Maa {
+        Ok(Maa {
             handle,
             uuid: None,
             target: None,
             tasks: HashMap::new(),
-        }
+        })
     }
 
-    pub fn get_null_size() -> u64 {
-        unsafe { AsstGetNullSize() }
+    /// Creates a new MAA instance with a callback
+    ///
+    /// # Parameters
+    /// * `callback` - A function that is called every time a message occurs in
+    ///   the backend
+    pub fn new_with_callback(callback: AsstApiCallback) -> Result<Self> {
+        Self::new_with_callback_and_args(callback, std::ptr::null_mut::<c_void>())
     }
 
-    pub fn with_callback_and_custom_arg(
+    /// Creates a new MAA instance with a callback and arguments
+    ///
+    /// # Parameters
+    /// * `callback` - A function that is called every time a message occurs in
+    ///   the backend
+    /// * `args` - The arguments that the callback uses
+    pub fn new_with_callback_and_args(
         callback: AsstApiCallback,
-        custom_arg: *mut c_void,
-    ) -> Self {
-        let handle = unsafe { AsstCreateEx(callback, custom_arg) };
-        Maa {
+        args: *mut c_void,
+    ) -> Result<Self> {
+        // Safety: This allocation might return a null pointer, for which we're
+        // going to check directly after and return an error to the caller.
+        let handle = unsafe { AsstCreateEx(callback, args) };
+        if handle.is_null() {
+            return Err(Error::AllocFailed);
+        }
+
+        Ok(Maa {
             handle,
             uuid: None,
             target: None,
             tasks: HashMap::new(),
-        }
+        })
     }
 
-    pub fn with_callback(callback: AsstApiCallback) -> Self {
-        Self::with_callback_and_custom_arg(callback, std::ptr::null_mut::<c_void>())
+    /// Gets the size of an object when it was not properly read
+    /// BUG: On the C/C++ side this is defined as the number _-1_,
+    /// however an u64 can never have that value
+    pub fn get_null_size() -> u64 {
+        // BUG:
+        unsafe { AsstGetNullSize() }
     }
 
     /// The default callback function that just prints the message and the detail json
