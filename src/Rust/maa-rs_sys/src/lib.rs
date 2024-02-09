@@ -272,12 +272,7 @@ impl Assistant {
         }
     }
 
-    pub fn connect(
-        &mut self,
-        adb_path: &str,
-        address: &str,
-        config: Option<String>,
-    ) -> Result<i32> {
+    pub fn connect(&mut self, adb_path: &str, address: &str, config: Option<String>) -> Result<()> {
         if self.handle.is_null() {
             return Err(Error::Null);
         }
@@ -305,43 +300,6 @@ impl Assistant {
         };
         if return_code != 0 {
             self.target = Some(address.to_string());
-            Ok(return_code)
-        } else {
-            Err(Error::Unknown)
-        }
-    }
-
-    #[deprecated]
-    pub fn connect_legacy(
-        &mut self,
-        adb_path: &str,
-        address: &str,
-        config: Option<&str>,
-    ) -> Result<()> {
-        if self.handle.is_null() {
-            return Err(Error::Null);
-        }
-
-        let c_adb_path = CString::new(adb_path)?;
-        let c_address = CString::new(address)?;
-        let c_cfg_ptr = match config {
-            Some(cfg) => CString::new(cfg)?.as_ptr(),
-            None => std::ptr::null::<c_char>(),
-        };
-
-        // Safety:
-        // * The handle is never null at this point
-        // * The strings are guaranteed to be null-terminated and valid since they were
-        //   created in safe rust with no errors.
-        let return_code = unsafe {
-            AsstConnect(
-                self.handle,
-                c_adb_path.as_ptr(),
-                c_address.as_ptr(),
-                c_cfg_ptr,
-            )
-        };
-        if return_code == 1 {
             Ok(())
         } else {
             Err(Error::Unknown)
