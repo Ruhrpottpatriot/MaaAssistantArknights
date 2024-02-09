@@ -68,8 +68,6 @@ impl OptionKey {
     }
 }
 
-
-
 /// Represents the type of a message.
 ///
 /// TODO: Convert the message type to a Rust enum
@@ -118,10 +116,15 @@ type Callback = fn(MessageType, &str);
 
 #[derive(Debug)]
 pub struct Assistant {
-    handle: AsstHandle,
+    handle: bind::AsstHandle,
     uuid: Option<String>,
     target: Option<String>,
     tasks: HashMap<TaskId, Task>,
+
+    /// A raw pointer to the callback function presented duting construction. This field
+    /// should NEVER be used, except for passing it to the backend and when dropping the
+    /// instance!
+    callback_ptr: Option<*mut Callback>,
 }
 
 impl Assistant {
@@ -140,16 +143,19 @@ impl Assistant {
     /// * `callback` - An optional function that is called every time a message occurs in
     ///   the backend.
     pub fn new(callback: Option<Callback>) -> Result<Self> {
-        let handle = match callback {
+        let (handle, callback_ptr) = match callback {
             Some(callback) => {
                 let args = Box::into_raw(Box::new(callback));
 
                 // Safety: This allocation might return a null pointer
-                unsafe { AsstCreateEx(Some(Self::trampoline::<Callback>), args as *mut _) }
+                let handlef =
+                    unsafe { AsstCreateEx(Some(Self::trampoline::<Callback>), args as *mut _) };
+                (handlef, Some(args))
             }
             None => {
                 // Safety: This allocation might return a null pointer
-                unsafe { AsstCreate() }
+                let handle = unsafe { AsstCreate() };
+                (handle, None)
             }
         };
 
@@ -162,6 +168,7 @@ impl Assistant {
             uuid: None,
             target: None,
             tasks: HashMap::new(),
+            callback_ptr,
         })
     }
 
@@ -249,8 +256,7 @@ impl Assistant {
         // Safety:
         // * The handle is never null at this point
         // * The string is guaranteed to be null-terminated and valid since it was
-        let return_code =
-            unsafe { AsstSetInstanceOption(self.handle, option.0, value.as_ptr()) };
+        let return_code = unsafe { AsstSetInstanceOption(self.handle, option.0, value.as_ptr()) };
         if return_code == 1 {
             Ok(())
         } else {
@@ -629,6 +635,12 @@ impl Drop for Assistant {
         }
 
         // Safety: The handle is never null at this point
-        unsafe { AsstDestroy(self.handle) }
+        unsafe {
+            AsstDestroy(self.handle);
+
+            if let Some(callback_ptr) = self.callback_ptr {
+                Box::from_raw(callback_ptr);
+            }
+        }
     }
 }
