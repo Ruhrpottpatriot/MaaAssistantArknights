@@ -1,5 +1,8 @@
-#![allow(dead_code)]
-#![warn(clippy::missing_safety_doc)]
+#![warn(
+    clippy::missing_safety_doc, 
+    clippy::clippy::multiple_unsafe_ops_per_block,
+    clippy::undocumented_unsafe_blocks
+)]
 
 use std::{
     collections::{HashMap, HashSet},
