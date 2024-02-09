@@ -1,10 +1,10 @@
 use crate::api::ManagerData;
 
-use super::{Error, MaaManager};
+use super::{Error};
 use actix_web::web::{self, Json};
 use actix_web::{delete, get, post, HttpResponse, Responder};
 use serde_json::json;
-use std::sync::Mutex;
+
 
 /// Registers all `/instances` routes
 pub fn config(cfg: &mut web::ServiceConfig) {

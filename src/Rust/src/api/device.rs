@@ -1,14 +1,14 @@
-use std::sync::Mutex;
+
 
 use actix_web::{
     post, web,
-    web::{Data, Json, Path},
+    web::{Json, Path},
     HttpResponse, Responder,
 };
 use serde::Deserialize;
-use serde_json::json;
 
-use crate::api::{Error, MaaManager, ManagerData};
+
+use crate::api::{Error, ManagerData};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(

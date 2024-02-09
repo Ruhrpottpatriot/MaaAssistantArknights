@@ -169,7 +169,7 @@ mod tests {
                 "path": "./"
             }
         }"#;
-        let actual = actual.replace("\n", "").replace(" ", "");
+        let actual = actual.replace(['\n', ' '], "");
         assert_eq!(data, actual);
     }
 }

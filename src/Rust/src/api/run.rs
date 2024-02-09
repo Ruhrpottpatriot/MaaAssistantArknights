@@ -1,12 +1,12 @@
 use crate::api::ManagerData;
 
-use super::{Error, MaaManager};
+use super::{Error};
 use actix_web::{
     post,
     web::{self, Json, Path},
     HttpResponse, Responder,
 };
-use std::sync::Mutex;
+
 
 /// Registers the endpoints for the run API
 pub fn config(cfg: &mut web::ServiceConfig) {
