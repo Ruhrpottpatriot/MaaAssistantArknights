@@ -53,6 +53,23 @@ pub enum Error {
     AllocFailed,
 }
 
+/// Represents the key used to identify an option value
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Display, Serialize)]
+#[repr(transparent)]
+pub struct OptionKey(pub(crate) bind::AsstStaticOptionKey);
+
+impl OptionKey {
+    /// Creates a new [`OptionKey`]
+    ///
+    /// # Parameters
+    /// * `id`:  The numerical id of the option
+    pub fn new(id: i32) -> Self {
+        Self(id)
+    }
+}
+
+
+
 /// Represents the type of a message.
 ///
 /// TODO: Convert the message type to a Rust enum
@@ -196,12 +213,12 @@ impl Assistant {
         Ok(version.to_str()?.to_string())
     }
 
-    pub fn set_static_option(option: AsstStaticOptionKey, value: &str) -> Result<()> {
+    pub fn set_static_option(option: OptionKey, value: &str) -> Result<()> {
         let c_option_value = CString::new(value)?;
 
         // Safety: The string is guaranteed to be null-terminated and valid since it was
         // created in safe rust with no errors.
-        let return_code = unsafe { AsstSetStaticOption(option, c_option_value.as_ptr()) };
+        let return_code = unsafe { AsstSetStaticOption(option.0, c_option_value.as_ptr()) };
         if return_code == 1 {
             Ok(())
         } else {
@@ -222,18 +239,18 @@ impl Assistant {
         }
     }
 
-    pub fn set_option(&mut self, option: AsstInstanceOptionKey, value: &str) -> Result<()> {
+    pub fn set_option(&mut self, option: OptionKey, value: &str) -> Result<()> {
         if self.handle.is_null() {
             return Err(Error::Null);
         }
 
-        let c_option_value = CString::new(value)?;
+        let value = CString::new(value)?;
 
         // Safety:
         // * The handle is never null at this point
         // * The string is guaranteed to be null-terminated and valid since it was
         let return_code =
-            unsafe { AsstSetInstanceOption(self.handle, option, c_option_value.as_ptr()) };
+            unsafe { AsstSetInstanceOption(self.handle, option.0, value.as_ptr()) };
         if return_code == 1 {
             Ok(())
         } else {
