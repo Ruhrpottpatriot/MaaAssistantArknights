@@ -13,5 +13,5 @@ pub async fn version() -> Result<impl Responder, Error> {
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.route("/version", web::post().to(version));
+    cfg.route("/version", web::get().to(version));
 }
