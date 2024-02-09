@@ -184,68 +184,6 @@ impl Assistant {
         println!("msg: {}: {}", msg_id, detail_json,);
     }
 
-    pub fn load_resource(path: &str) -> Result<()> {
-        let path = CString::new(path.to_string())?;
-
-        // Safety: The path pointe is guaranteed to be valid and null-terminated since it was
-        // created in safe rust with no errors.
-        let return_code = unsafe { AsstLoadResource(path.as_ptr()) };
-        match return_code {
-            1 => Ok(()),
-            _ => Err(Error::Unknown),
-        }
-    }
-
-    /// Gets the current version of the MAA library
-    pub fn get_version() -> Result<String> {
-        // Safety: The version string pointer is checked to be non-null. However, no
-        // guarantees can be made at this point whether the string contains a
-        // null-terminator.
-        // This block also contains multiple unsafe operations, which we usually want to
-        // avoid. However, in this case the second operation directly depends on the first
-        // and therefore should be in the same block.
-        #[allow(clippy::multiple_unsafe_ops_per_block)]
-        let version = unsafe {
-            let version = AsstGetVersion();
-            if version.is_null() {
-                return Err(Error::Null);
-            }
-
-            CStr::from_ptr(version)
-        };
-
-        // Throw an error instead of replacing invalid utf8 characters
-        // TODO: Return a reference instead of a cloned string
-        // TODO: The returned version is should be a SemVer  struct
-        Ok(version.to_str()?.to_string())
-    }
-
-    pub fn set_static_option(option: OptionKey, value: &str) -> Result<()> {
-        let c_option_value = CString::new(value)?;
-
-        // Safety: The string is guaranteed to be null-terminated and valid since it was
-        // created in safe rust with no errors.
-        let return_code = unsafe { AsstSetStaticOption(option.0, c_option_value.as_ptr()) };
-        if return_code == 1 {
-            Ok(())
-        } else {
-            Err(Error::Unknown)
-        }
-    }
-
-    pub fn set_working_directory(path: &str) -> Result<()> {
-        let c_path = CString::new(path)?;
-
-        // Safety: The string is guaranteed to be null-terminated and valid since it was
-        // created in safe rust with no errors.
-        let return_code = unsafe { AsstSetUserDir(c_path.as_ptr()) };
-        if return_code == 1 {
-            Ok(())
-        } else {
-            Err(Error::Unknown)
-        }
-    }
-
     pub fn set_option(&mut self, option: OptionKey, value: &str) -> Result<()> {
         if self.handle.is_null() {
             return Err(Error::Null);
@@ -291,6 +229,7 @@ impl Assistant {
                 c_adb_path.as_ptr(),
                 c_address.as_ptr(),
                 c_cfg_ptr,
+                // Question: The line below makes the code blocking. Is this intended?
                 1,
             )
         };
@@ -579,20 +518,6 @@ impl Assistant {
         }
     }
 
-    /// Passes the given log message to the underlying MAA instance
-    pub fn log(level_str: &str, message: &str) -> Result<()> {
-        let c_level_str = CString::new(level_str)?;
-        let c_message = CString::new(message)?;
-
-        // Safety: The strings are guaranteed to be null-terminated and valid since they
-        // were created in safe code with no errors.
-        unsafe {
-            AsstLog(c_level_str.as_ptr(), c_message.as_ptr());
-        }
-
-        Ok(())
-    }
-
     /// Wraps the Rust callback so that it can be passed over C-FFI bounds to the backend
     ///
     /// This trampoline function is necessary so the rust callback function can be called
@@ -646,4 +571,128 @@ impl Drop for Assistant {
             }
         }
     }
+}
+
+/// Loads a resource from the given path
+///
+/// Since paths on Windows might contain non UTF-8 characters, this function needs to
+/// covert the path into bytes first, which might fail. On the other hand convert the
+/// path to a C string. This is pretty straightworard on UNIX based systems, since
+/// there paths are just a sequence of bytes. However, on Windows paths are either
+/// passed as ASCII or UTF-16. Passing UTF-8 paths to the system is not supported.
+/// Therefore we have to make a distinction between windows and unix, which means a
+/// slight performance hit on non-UNIX systems. See:
+/// * https://stackoverflow.com/questions/38948669/
+/// * https://internals.rust-lang.org/t/pathbuf-to-cstring/12560
+pub fn load_resource<P: AsRef<Path>>(path: P) -> Result<()> {
+    #[cfg(unix)]
+    fn to_bytes<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
+        use std::os::unix::ffi::OsStrExt;
+        Some(path.as_ref().as_os_str().as_bytes().to_vec())
+    }
+
+    #[cfg(not(unix))]
+    fn path_to_bytes<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
+        // On Windows, could use std::os::windows::ffi::OsStrExt to encode_wide(),
+        // but you end up with a Vec<u16> instead of a Vec<u8>, so that doesn't
+        // really help.
+        path.as_ref()
+            .to_str()
+            .map(|s| s.as_bytes())
+            .map(|b| b.to_vec())
+    }
+
+    let path = path_to_bytes(path).ok_or(Error::InvalidPath)?;
+    let path = CString::new(path)?;
+
+    // Safety: The path pointer is guaranteed to be valid and null-terminated
+    let return_code = unsafe { AsstLoadResource(path.as_ptr()) };
+    match return_code {
+        1 => Ok(()),
+        _ => Err(Error::Unknown),
+    }
+}
+
+/// Gets the current version of the MAA library
+/// 
+/// # Examples
+/// ```rust, ignore
+/// use maa_rs_sys::get_version;
+/// 
+/// let version = get_version().unwrap();
+/// println!("The version of the MAA library is: {}", version);
+/// ```
+pub fn get_version() -> Result<String> {
+    // Safety: The version string pointer is checked to be non-null. However, no
+    // guarantees can be made at this point whether the string contains a
+    // null-terminator.
+    // This block also contains multiple unsafe operations, which we usually want to
+    // avoid. However, in this case the second operation directly depends on the first
+    // and therefore should be in the same block.
+    #[allow(clippy::multiple_unsafe_ops_per_block)]
+    let version = unsafe {
+        let version = AsstGetVersion();
+        if version.is_null() {
+            return Err(Error::Null);
+        }
+
+        CStr::from_ptr(version)
+    };
+
+    // Throw an error instead of replacing invalid utf8 characters
+    // TODO: Return a reference instead of a cloned string
+    // TODO: The returned version is should be a SemVer  struct
+    Ok(version.to_str()?.to_string())
+}
+
+/// Sets a process wide option
+///
+/// # Parameters
+/// * `option` - The key of the option to set
+/// * `value` - The value to set the option
+///
+/// # Examples
+/// ```rust, ignore
+/// use maa_rs_sys::{Assistant, OptionKey};
+///
+/// Assistant::set_static_option(OptionKey::new(1), "value");
+/// ```
+pub fn set_static_option(option: OptionKey, value: &str) -> Result<()> {
+    let c_option_value = CString::new(value)?;
+
+    // Safety: The string is guaranteed to be null-terminated and valid since it was
+    // created in safe rust with no errors.
+    let return_code = unsafe { AsstSetStaticOption(option.0, c_option_value.as_ptr()) };
+    if return_code == 1 {
+        Ok(())
+    } else {
+        Err(Error::Unknown)
+    }
+}
+
+pub fn set_working_directory(path: &str) -> Result<()> {
+    let c_path = CString::new(path)?;
+
+    // Safety: The string is guaranteed to be null-terminated and valid since it was
+    // created in safe rust with no errors.
+    let return_code = unsafe { AsstSetUserDir(c_path.as_ptr()) };
+    if return_code == 1 {
+        Ok(())
+    } else {
+        Err(Error::Unknown)
+    }
+}
+
+/// Passes the given log message to the underlying MAA instance
+pub fn log(level_str: &str, message: &str) -> Result<()> {
+    let c_level_str = CString::new(level_str)?;
+    let c_message = CString::new(message)?;
+
+    // Safety: The strings are guaranteed to be null-terminated and valid since they
+    // were created in safe code with no errors.
+    unsafe {
+        AsstLog(c_level_str.as_ptr(), c_message.as_ptr());
+    }
+
+    Ok(())
 }
