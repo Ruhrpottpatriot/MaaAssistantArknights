@@ -42,8 +42,8 @@ pub enum Error {
     #[error("Could not allocate such a large buffer")]
     TooLargeAlloc,
 
-    #[error("A value was null")]
-    Null,
+    #[error("The handle to the backend is invalid")]
+    InvalidHandle,
 
     #[error(transparent)]
     CNull(#[from] NulError),
@@ -257,7 +257,7 @@ impl Assistant {
 
     pub fn set_option(&mut self, option: OptionKey, value: &str) -> Result<()> {
         if self.handle.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         let value = CString::new(value)?;
@@ -275,7 +275,7 @@ impl Assistant {
 
     pub fn connect(&mut self, adb_path: &str, address: &str, config: Option<String>) -> Result<()> {
         if self.handle.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         let c_adb_path = CString::new(adb_path)?;
@@ -325,7 +325,7 @@ impl Assistant {
     /// Clicks on the screen at the given coordinates
     pub fn click(&self, x: i32, y: i32) -> Result<i32> {
         if self.handle.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         // Safety: The handle is never null at this point
@@ -339,7 +339,7 @@ impl Assistant {
 
     pub fn screenshot(&self) -> Result<Vec<u8>> {
         if self.handle.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         let mut buff_size = 2 * 1920 * 1080 * 4;
@@ -377,7 +377,7 @@ impl Assistant {
 
     pub fn take_screenshot(&mut self) -> Result<()> {
         if self.handle.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         // Safety: The handle is never null at this point
@@ -390,7 +390,7 @@ impl Assistant {
 
     pub fn create_task(&mut self, type_: &str, params: &str) -> Result<TaskId> {
         if self.handle.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         let c_type = CString::new(type_)?;
@@ -414,7 +414,7 @@ impl Assistant {
 
     pub fn set_task(&self, id: i32, params: &str) -> Result<()> {
         if self.handle.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         let c_params = CString::new(params)?;
@@ -434,7 +434,7 @@ impl Assistant {
         };
 
         if self.handle.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         let mut buff_size = 1024;
@@ -475,7 +475,7 @@ impl Assistant {
     /// Gets a list of tasks that are currently configured
     pub fn get_tasks(&mut self) -> Result<&HashMap<TaskId, Task>> {
         if self.handle.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         let mut buff_size = 1024;
@@ -519,10 +519,10 @@ impl Assistant {
         }
     }
 
-    /// Starts the configured tasks
+    /// Starts the list of configured tasks
     pub fn start(&self) -> Result<()> {
         if self.handle.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         // Safety: The handle is never null at this point
@@ -533,10 +533,10 @@ impl Assistant {
         }
     }
 
-    /// Stops the configured tasks
+    /// Stops the currently running and all following tasks
     pub fn stop(&self) -> Result<()> {
-        if self.handle.is_null() {
-            return Err(Error::Null);
+        if self.handle.is_null()  {
+            return Err(Error::InvalidHandle);
         }
 
         // Safety: The handle is never null at this point
@@ -635,7 +635,7 @@ pub fn get_version() -> Result<String> {
     let version = unsafe {
         let version = AsstGetVersion();
         if version.is_null() {
-            return Err(Error::Null);
+            return Err(Error::InvalidHandle);
         }
 
         CStr::from_ptr(version)
