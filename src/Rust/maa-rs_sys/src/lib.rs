@@ -58,7 +58,7 @@ pub enum Error {
 /// TODO: Convert the message type to a Rust enum
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Display, Serialize)]
 #[repr(transparent)]
-pub struct MessageType(pub(crate) AsstMsgId);
+pub struct MessageType(pub(crate) bind::AsstMsgId);
 
 impl MessageType {
     /// Creates a new [`MessageId`]
@@ -74,10 +74,24 @@ impl MessageType {
     }
 }
 
+/// Represents the ID of a task.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Display, Serialize)]
+#[repr(transparent)]
+pub struct TaskId(pub(crate) bind::AsstTaskId);
+
+impl TaskId {
+    /// Creates a new [`TaskId`]
+    ///
+    /// # Parameters
+    /// * `id`:  The numerical id of the task
+    pub fn new(id: i32) -> Self {
+        Self(id)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Task {
-    pub id: i32,
+    pub id: TaskId,
     pub type_: String,
     pub params: String,
 }
@@ -90,7 +104,7 @@ pub struct Assistant {
     handle: AsstHandle,
     uuid: Option<String>,
     target: Option<String>,
-    tasks: HashMap<i32, Task>,
+    tasks: HashMap<TaskId, Task>,
 }
 
 impl Assistant {
@@ -383,7 +397,7 @@ impl Assistant {
         }
     }
 
-    pub fn create_task(&mut self, type_: &str, params: &str) -> Result<AsstTaskId> {
+    pub fn create_task(&mut self, type_: &str, params: &str) -> Result<TaskId> {
         if self.handle.is_null() {
             return Err(Error::Null);
         }
@@ -394,6 +408,7 @@ impl Assistant {
         // Safety: The handle is never null at this point and the strings are guaranteed
         // to be valid and null-terminated
         let task_id = unsafe { AsstAppendTask(self.handle, c_type.as_ptr(), c_params.as_ptr()) };
+        let task_id = TaskId(task_id);
         self.tasks.insert(
             task_id,
             Task {
@@ -467,7 +482,7 @@ impl Assistant {
     }
 
     /// Gets a list of tasks that are currently configured
-    pub fn get_tasks(&mut self) -> Result<&HashMap<i32, Task>> {
+    pub fn get_tasks(&mut self) -> Result<&HashMap<TaskId, Task>> {
         if self.handle.is_null() {
             return Err(Error::Null);
         }
@@ -503,6 +518,7 @@ impl Assistant {
             let mut task_ids = HashSet::with_capacity(buff.len());
 
             for i in buff {
+                let i = TaskId(i);
                 task_ids.insert(i);
             }
 
@@ -569,7 +585,7 @@ impl Assistant {
     /// invalid UTF-8 characters will cause a panic. A proper approach would either return
     /// a [`Resul<T, E>`] or set the parameter to a sane default like an empty string. A
     /// third approach could use an error flag that can be checked by the caller.
-    unsafe extern "C" fn trampoline<F>(i: AsstMsgId, data: *const c_char, ctx: *mut c_void)
+    unsafe extern "C" fn trampoline<F>(i: bind::AsstMsgId, data: *const c_char, ctx: *mut c_void)
     where
         F: FnMut(MessageType, &str) + 'static,
     {
