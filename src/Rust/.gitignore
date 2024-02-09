@@ -17,3 +17,6 @@ Cargo.lock
 resource/
 resource
 database/
+
+# Exclude the bindings file
+**/bind.rs
