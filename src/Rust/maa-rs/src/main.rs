@@ -9,7 +9,7 @@ use config::CONFIG;
 use maa_rs_sys::Maa;
 use std::{error::Error, sync::Mutex};
 
-const SERVER_VERSION: &str = "v0.1.0";
+
 
 fn main() -> Result<(), Box<dyn Error>> {
     Maa::load_resource(&CONFIG.resource.path).unwrap();
