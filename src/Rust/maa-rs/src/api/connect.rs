@@ -19,7 +19,7 @@ pub async fn target(id: Path<i64>, manager: ManagerData) -> Result<impl Responde
     let manager = manager.lock().map_err(Error::from)?;
 
     manager.get(id).ok_or(Error::InstanceNotFound)?;
-    let target = manager.get_target(id);
+    let target = manager.target(id);
 
     Ok(HttpResponse::Ok().json(json!({"target": target})))
 }

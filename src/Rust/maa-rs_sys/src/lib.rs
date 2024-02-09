@@ -467,9 +467,12 @@ impl Assistant {
         }
     }
 
-    pub fn get_target(&self) -> Option<String> {
-        // TODO: Give out a reference
-        self.target.clone()
+    /// Get the current target address
+    /// 
+    /// The target address is usually an IP, but can be anything
+    /// Question: Is the target address always an IP?
+    pub fn target(&self) -> Option<&str> {
+        self.target.as_deref()
     }
 
     /// Gets a list of tasks that are currently configured

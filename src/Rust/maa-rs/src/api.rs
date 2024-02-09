@@ -107,9 +107,9 @@ impl MaaManager {
     pub fn get_mut(&mut self, id: i64) -> Option<&mut Assistant> {
         self.instances.get_mut(&id)
     }
-    pub fn get_target(&self, id: i64) -> Option<String> {
+    pub fn target(&self, id: i64) -> Option<&str> {
         let maa = self.get(id)?;
-        maa.get_target()
+        maa.target()
     }
     pub fn delete(&mut self, id: i64) -> Option<Assistant> {
         self.instances.remove(&id)
