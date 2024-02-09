@@ -1,17 +1,24 @@
-use std::{collections::HashMap, ffi::c_void};
-use actix_web::{web, HttpResponse, http::{StatusCode, header::ContentType}};
+use crate::{
+    database,
+    maa_sys::{self, Maa},
+};
+use actix_web::{
+    http::{header::ContentType, StatusCode},
+    web, HttpResponse,
+};
 use serde_json::json;
-use crate::{maa_sys::{Maa, self}, database};
+use std::{collections::HashMap, ffi::c_void, sync::PoisonError};
 
-mod instances;
 mod connect;
-mod message;
-mod version;
 mod device;
+mod instances;
+mod message;
+mod run;
 mod task;
 mod uuid;
-mod run;
+mod version;
 
+/// Registers the API routes with the server
 pub fn config(cfg: &mut web::ServiceConfig) {
     instances::config(cfg);
     connect::config(cfg);
@@ -22,6 +29,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     uuid::config(cfg);
     run::config(cfg);
 }
+
+
 #[derive(Debug)]
 pub enum Error {
     Internal,
@@ -29,7 +38,18 @@ pub enum Error {
     InvalidRequest,
 }
 
-impl From<maa_sys::Error> for Error{
+impl From<database::Error> for Error {
+    fn from(_: database::Error) -> Self {
+        Self::Internal
+    }
+}
+impl<T> From<PoisonError<T>> for Error {
+    fn from(_: PoisonError<T>) -> Self {
+        Self::Internal
+    }
+}
+
+impl From<maa_sys::Error> for Error {
     fn from(_: maa_sys::Error) -> Self {
         Self::Internal
     }
@@ -42,15 +62,15 @@ impl std::fmt::Display for Error {
 
 impl actix_web::error::ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
-        let body =match self {
+        let body = match self {
             Error::Internal => json!({
-                "error":"内部错误"
+                "error":"Internal Error"
             }),
             Error::InstanceNotFound => json!({
-                "error":"实例不存在"
+                "error":"Instance Not Found"
             }),
             Error::InvalidRequest => json!({
-                "error":"无效的请求"
+                "error":"Invalid Request"
             }),
         };
         HttpResponse::build(self.status_code())
@@ -61,45 +81,50 @@ impl actix_web::error::ResponseError for Error {
         StatusCode::OK
     }
 }
- 
-pub struct MaaManager{
-    pub instances:HashMap<i64, Maa>,
-    id:i64
+
+pub type ManagerData = web::Data<std::sync::Mutex<MaaManager>>;
+
+pub struct MaaManager {
+    pub instances: HashMap<i64, Maa>,
+    id: i64,
 }
 
 impl MaaManager {
-    pub fn new()->Self{
-        MaaManager { 
-            instances: HashMap::new(), 
-            id:0 
+    pub fn new() -> Self {
+        MaaManager {
+            instances: HashMap::new(),
+            id: 0,
         }
     }
-    pub fn create(&mut self)->i64{
+    pub fn create(&mut self) -> i64 {
         let id = self.gen_id();
-        let maa = Maa::with_callback_and_custom_arg(Some(database::maa_store_callback), id as *mut c_void);
+        let maa = Maa::with_callback_and_custom_arg(
+            Some(database::maa_store_callback),
+            id as *mut c_void,
+        );
         self.instances.insert(id, maa);
         id
     }
-    pub fn get(&self, id:i64)->Option<&Maa>{
+    pub fn get(&self, id: i64) -> Option<&Maa> {
         self.instances.get(&id)
     }
-    pub fn get_mut(&mut self, id:i64)->Option<&mut Maa>{
+    pub fn get_mut(&mut self, id: i64) -> Option<&mut Maa> {
         self.instances.get_mut(&id)
     }
-    pub fn get_target(&self, id:i64)->Option<String>{
+    pub fn get_target(&self, id: i64) -> Option<String> {
         let maa = self.get(id)?;
-        maa.get_target() 
+        maa.get_target()
     }
-    pub fn delete(&mut self, id:i64)->Option<Maa>{
-        
+    pub fn delete(&mut self, id: i64) -> Option<Maa> {
         self.instances.remove(&id)
     }
-    pub fn get_all_id(&self)->Vec<i64>{
+    pub fn get_all_id(&self) -> Vec<i64> {
         self.instances.keys().copied().collect()
     }
-    pub fn gen_id(&mut self)->i64{
+    pub fn gen_id(&mut self) -> i64 {
         self.id += 1;
         self.id
     }
 }
-unsafe impl Send for MaaManager{}
+
+unsafe impl Send for MaaManager {}
