@@ -27,7 +27,7 @@ fn main() -> std::io::Result<()> {
                 .wrap(middleware::Logger::default())
                 .configure(api::config)
         })
-        .bind((CONFIG.server.address.clone(), CONFIG.server.port))?
+        .bind((CONFIG.server.address, CONFIG.server.port))?
         .run()
         .await
     })

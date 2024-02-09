@@ -1,6 +1,6 @@
 #![warn(
-    clippy::missing_safety_doc, 
-    clippy::clippy::multiple_unsafe_ops_per_block,
+    clippy::missing_safety_doc,
+    clippy::multiple_unsafe_ops_per_block,
     clippy::undocumented_unsafe_blocks
 )]
 
@@ -94,9 +94,9 @@ impl Maa {
     pub fn load_resource(path: &str) -> Result<(), Error> {
         let path = CString::new(path.to_string())?;
 
-        let return_code = unsafe {
-            AsstLoadResource(path.as_ptr())
-        };
+        // Safety: The path pointe is guaranteed to be valid and null-terminated since it was
+        // created in safe rust with no errors.
+        let return_code = unsafe { AsstLoadResource(path.as_ptr()) };
         match return_code {
             1 => Ok(()),
             _ => Err(Error::Unknown),
@@ -105,8 +105,19 @@ impl Maa {
 
     /// Gets the current version of the MAA library
     pub fn get_version() -> Result<String, Error> {
+        // Safety: The version string pointer is checked to be non-null. However, no
+        // guarantees can be made at this point whether the string contains a
+        // null-terminator.
+        // This block also contains multiple unsafe operations, which we usually want to
+        // avoid. However, in this case the second operation directly depends on the first
+        // and therefore should be in the same block.
+        #[allow(clippy::multiple_unsafe_ops_per_block)]
         let version = unsafe {
             let version = AsstGetVersion();
+            if version.is_null() {
+                return Err(Error::Null);
+            }
+
             CStr::from_ptr(version)
         };
 
@@ -119,6 +130,8 @@ impl Maa {
     pub fn set_static_option(option: AsstStaticOptionKey, value: &str) -> Result<(), Error> {
         let c_option_value = CString::new(value)?;
 
+        // Safety: The string is guaranteed to be null-terminated and valid since it was
+        // created in safe rust with no errors.
         let return_code = unsafe { AsstSetStaticOption(option, c_option_value.as_ptr()) };
         if return_code == 1 {
             Ok(())
@@ -130,6 +143,8 @@ impl Maa {
     pub fn set_working_directory(path: &str) -> Result<(), Error> {
         let c_path = CString::new(path)?;
 
+        // Safety: The string is guaranteed to be null-terminated and valid since it was
+        // created in safe rust with no errors.
         let return_code = unsafe { AsstSetUserDir(c_path.as_ptr()) };
         if return_code == 1 {
             Ok(())
@@ -145,6 +160,9 @@ impl Maa {
 
         let c_option_value = CString::new(value)?;
 
+        // Safety:
+        // * The handle is never null at this point
+        // * The string is guaranteed to be null-terminated and valid since it was
         let return_code =
             unsafe { AsstSetInstanceOption(self.handle, option, c_option_value.as_ptr()) };
         if return_code == 1 {
@@ -171,6 +189,10 @@ impl Maa {
             None => std::ptr::null::<c_char>(),
         };
 
+        // Safety:
+        // * The handle is never null at this point
+        // * The strings are guaranteed to be null-terminated and valid since they were
+        //   created in safe rust with no errors.
         let return_code = unsafe {
             AsstAsyncConnect(
                 self.handle,
@@ -206,6 +228,10 @@ impl Maa {
             None => std::ptr::null::<c_char>(),
         };
 
+        // Safety:
+        // * The handle is never null at this point
+        // * The strings are guaranteed to be null-terminated and valid since they were
+        //   created in safe rust with no errors.
         let return_code = unsafe {
             AsstConnect(
                 self.handle,
@@ -231,14 +257,18 @@ impl Maa {
             return false;
         }
 
-        unsafe { AsstRunning(self.handle) == 1 }
+        // Safety: The handle is never null at this point
+        let return_code = unsafe { AsstRunning(self.handle) };
+        return_code == 1
     }
 
+    /// Clicks on the screen at the given coordinates
     pub fn click(&self, x: i32, y: i32) -> Result<i32, Error> {
         if self.handle.is_null() {
             return Err(Error::Null);
         }
 
+        // Safety: The handle is never null at this point
         let return_code = unsafe { AsstAsyncClick(self.handle, x, y, 0) };
         if return_code != 0 {
             Ok(return_code)
@@ -258,6 +288,9 @@ impl Maa {
                 return Err(Error::TooLargeAlloc);
             }
             let mut buff: Vec<u8> = Vec::with_capacity(buff_size);
+
+            // Safety: The handle is never null at this point and the buffer is guaranteed
+            // to be valid
             let data_size = unsafe {
                 AsstGetImage(
                     self.handle,
@@ -270,6 +303,12 @@ impl Maa {
                 continue;
             }
 
+            let data_size = data_size as usize;
+            if data_size > buff.capacity() {
+                return Err(Error::TooLargeAlloc);
+            }
+
+            // Safety: The new length of the buffer is guaranteed to be a valid size
             unsafe { buff.set_len(data_size as usize) };
             buff.resize(data_size as usize, 0);
             return Ok(buff);
@@ -281,6 +320,7 @@ impl Maa {
             return Err(Error::Null);
         }
 
+        // Safety: The handle is never null at this point
         let return_code = unsafe { AsstAsyncScreencap(self.handle, 1) };
         match return_code {
             0 => Err(Error::Unknown),
@@ -296,6 +336,8 @@ impl Maa {
         let c_type = CString::new(type_)?;
         let c_params = CString::new(params)?;
 
+        // Safety: The handle is never null at this point and the strings are guaranteed
+        // to be valid and null-terminated
         let task_id = unsafe { AsstAppendTask(self.handle, c_type.as_ptr(), c_params.as_ptr()) };
         self.tasks.insert(
             task_id,
@@ -316,6 +358,8 @@ impl Maa {
 
         let c_params = CString::new(params)?;
 
+        // Safety: The handle is never null at this point and the string is guaranteed to
+        // be valid and null-terminated
         let return_code = unsafe { AsstSetTaskParams(self.handle, id, c_params.as_ptr()) };
         match return_code {
             1 => Ok(()),
@@ -338,13 +382,24 @@ impl Maa {
                 return Err(Error::TooLargeAlloc);
             }
             let mut buff: Vec<u8> = Vec::with_capacity(buff_size);
+
+            // Safety:
+            // * The handle is never null at this point
+            // * The buffer is guaranteed to be valid
             let data_size =
                 unsafe { AsstGetUUID(self.handle, buff.as_mut_ptr() as *mut i8, buff_size as u64) };
             if data_size == Self::get_null_size() {
                 buff_size *= 2;
                 continue;
             }
-            unsafe { buff.set_len(data_size as usize) };
+
+            let data_size = data_size as usize;
+            if data_size > buff.capacity() {
+                return Err(Error::TooLargeAlloc);
+            }
+
+            // Safety: The new length of the buffer is guaranteed to be a valid size
+            unsafe { buff.set_len(data_size) };
             let ret = String::from_utf8_lossy(&buff).to_string();
             self.uuid = Some(ret.clone());
             return Ok(ret);
@@ -368,6 +423,10 @@ impl Maa {
                 return Err(Error::TooLargeAlloc);
             }
             let mut buff: Vec<i32> = Vec::with_capacity(buff_size);
+
+            // Safety:
+            // * The handle is never null at this point
+            // * The buffer is guaranteed to be valid
             let data_size =
                 unsafe { AsstGetTasksList(self.handle, buff.as_mut_ptr(), buff_size as u64) };
 
@@ -376,7 +435,13 @@ impl Maa {
                 continue;
             }
 
-            unsafe { buff.set_len(data_size as usize) };
+            let data_size = data_size as usize;
+            if data_size > buff.capacity() {
+                return Err(Error::TooLargeAlloc);
+            }
+
+            // Safety: The new length of the buffer is guaranteed to be a valid size
+            unsafe { buff.set_len(data_size) };
 
             buff.resize(data_size as usize, 0);
 
@@ -398,6 +463,7 @@ impl Maa {
             return Err(Error::Null);
         }
 
+        // Safety: The handle is never null at this point
         let return_code = unsafe { AsstStart(self.handle) };
         match return_code {
             1 => Ok(()),
@@ -411,6 +477,7 @@ impl Maa {
             return Err(Error::Null);
         }
 
+        // Safety: The handle is never null at this point
         let return_code = unsafe { AsstStop(self.handle) };
         match return_code {
             1 => Ok(()),
@@ -423,6 +490,8 @@ impl Maa {
         let c_level_str = CString::new(level_str)?;
         let c_message = CString::new(message)?;
 
+        // Safety: The strings are guaranteed to be null-terminated and valid since they
+        // were created in safe code with no errors.
         unsafe {
             AsstLog(c_level_str.as_ptr(), c_message.as_ptr());
         }
@@ -437,6 +506,7 @@ impl Drop for Maa {
             return;
         }
 
+        // Safety: The handle is never null at this point
         unsafe { AsstDestroy(self.handle) }
     }
 }
