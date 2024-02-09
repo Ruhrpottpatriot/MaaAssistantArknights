@@ -40,7 +40,7 @@ pub async fn single(id: Path<i64>, manager: ManagerData) -> Result<impl Responde
     let id = id.into_inner();
 
     let maa = manager.get_mut(id).ok_or(Error::InstanceNotFound)?;
-    let uuid = maa.get_uuid()?;
+    let uuid = maa.uuid()?;
 
     Ok(HttpResponse::Ok().json(json!({
         "uuid": uuid

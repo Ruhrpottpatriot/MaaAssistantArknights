@@ -34,7 +34,7 @@ pub async fn all(id: Path<i64>, manager: ManagerData) -> Result<impl Responder, 
     let maa = manager.get_mut(id).ok_or(Error::InstanceNotFound)?;
     let tasks = {
         let mut tmp = HashMap::new();
-        for (k, v) in maa.get_tasks()? {
+        for (k, v) in maa.tasks()? {
             tmp.insert(
                 k.to_string(),
                 json!({

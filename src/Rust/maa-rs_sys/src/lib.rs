@@ -428,47 +428,46 @@ impl Assistant {
         }
     }
 
-    pub fn get_uuid(&mut self) -> Result<String> {
-        if let Some(uuid) = self.uuid.clone() {
-            return Ok(uuid);
-        };
-
+    pub fn uuid(&mut self) -> Result<&str> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
 
-        let mut buff_size = 1024;
-        loop {
-            if buff_size > 1024 * 1024 {
-                return Err(Error::TooLargeAlloc);
-            }
-            let mut buff: Vec<u8> = Vec::with_capacity(buff_size);
+        if self.uuid.is_none() {
+            let mut buff_size = 1024;
+            loop {
+                if buff_size > 1024 * 1024 {
+                    return Err(Error::TooLargeAlloc);
+                }
+                let mut buff: Vec<u8> = Vec::with_capacity(buff_size);
 
-            // Safety:
-            // * The handle is never null at this point
-            // * The buffer is guaranteed to be valid
-            let data_size =
-                unsafe { AsstGetUUID(self.handle, buff.as_mut_ptr() as *mut i8, buff_size as u64) };
-            if data_size == Self::get_null_size() {
-                buff_size *= 2;
-                continue;
-            }
+                // Safety:
+                // * The handle is never null at this point
+                // * The buffer is guaranteed to be valid
+                let data_size = unsafe {
+                    AsstGetUUID(self.handle, buff.as_mut_ptr() as *mut i8, buff_size as u64)
+                };
+                if data_size == Self::get_null_size() {
+                    buff_size *= 2;
+                    continue;
+                }
 
-            let data_size = data_size as usize;
-            if data_size > buff.capacity() {
-                return Err(Error::TooLargeAlloc);
-            }
+                let data_size = data_size as usize;
+                if data_size > buff.capacity() {
+                    return Err(Error::TooLargeAlloc);
+                }
 
-            // Safety: The new length of the buffer is guaranteed to be a valid size
-            unsafe { buff.set_len(data_size) };
-            let ret = String::from_utf8_lossy(&buff).to_string();
-            self.uuid = Some(ret.clone());
-            return Ok(ret);
+                // Safety: The new length of the buffer is guaranteed to be a valid size
+                unsafe { buff.set_len(data_size) };
+                self.uuid = Some(String::from_utf8_lossy(&buff).to_string());
+            }
         }
+
+        Ok(self.uuid.as_deref().expect("The uuid was set just above and therefore is guaranteed to be valid."))
     }
 
     /// Get the current target address
-    /// 
+    ///
     /// The target address is usually an IP, but can be anything
     /// Question: Is the target address always an IP?
     pub fn target(&self) -> Option<&str> {
@@ -476,7 +475,7 @@ impl Assistant {
     }
 
     /// Gets a list of tasks that are currently configured
-    pub fn get_tasks(&mut self) -> Result<&HashMap<TaskId, Task>> {
+    pub fn tasks(&mut self) -> Result<&HashMap<TaskId, Task>> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
@@ -538,7 +537,7 @@ impl Assistant {
 
     /// Stops the currently running and all following tasks
     pub fn stop(&self) -> Result<()> {
-        if self.handle.is_null()  {
+        if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
 
@@ -619,11 +618,11 @@ pub fn load_resource<P: AsRef<Path>>(path: P) -> Result<()> {
 }
 
 /// Gets the current version of the MAA library
-/// 
+///
 /// # Examples
 /// ```rust, ignore
 /// use maa_rs_sys::get_version;
-/// 
+///
 /// let version = get_version().unwrap();
 /// println!("The version of the MAA library is: {}", version);
 /// ```
@@ -676,17 +675,17 @@ pub fn set_static_option(option: OptionKey, value: &str) -> Result<()> {
 }
 
 /// Sets the working directory of the MAA backend
-/// 
+///
 /// The working directory is the directory where the backend stores the log files or looks
 /// up cache entries.
-/// 
+///
 /// # Parameters
 /// * `path` - The path to the new working directory
-/// 
+///
 /// # Examples
 /// ```rust, ignore
 /// use maa_rs_sys::set_working_directory;
-/// 
+///
 /// set_working_directory("/path/to/working/directory");
 /// ```
 pub fn set_working_directory<P: AsRef<Path>>(path: P) -> Result<()> {
@@ -706,7 +705,7 @@ pub fn set_working_directory<P: AsRef<Path>>(path: P) -> Result<()> {
 /// Enumerates the posdible log levels for the MAA backend
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, EnumString, strum::Display)]
 pub enum LogLevel {
-    #[strum(serialize = "TRC")]    
+    #[strum(serialize = "TRC")]
     Trace,
 
     #[strum(serialize = "DBG")]
@@ -723,15 +722,15 @@ pub enum LogLevel {
 }
 
 /// Logs a message with the backend
-/// 
+///
 /// # Parameters
 /// * `level` - The log level of the message
 /// * `message` - The message to log
-/// 
+///
 /// # Examples
 /// ```rust, ignore
 /// use maa_rs_sys::{log, LogLevel};
-/// 
+///
 /// log(LogLevel::Info, "This is an info message");
 /// ```
 pub fn log(level: LogLevel, message: &str) -> Result<()> {
