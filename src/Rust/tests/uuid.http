@@ -1,0 +1,8 @@
+### Get all UUIDs stored in the database
+GET /uuid HTTP/1.1
+Host: 127.0.0.1:8080
+
+### Get a single UUID by its ID
+GET  /uuid/1 HTTP/1.1
+Host: 127.0.0.1:8080
+Accept: application/json
