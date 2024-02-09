@@ -1,7 +1,10 @@
+#![allow(dead_code)]
+
 mod maa_sys;
 mod database;
 mod api;
 mod config;
+
 use config::CONFIG;
 use std::sync::Mutex;
 use maa_sys::Maa;
