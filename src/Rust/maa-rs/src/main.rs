@@ -3,11 +3,10 @@
 mod api;
 mod config;
 mod database;
-mod maa_sys;
 
 use actix_web::{middleware, rt, web, App, HttpServer};
 use config::CONFIG;
-use maa_sys::Maa;
+use maa_rs_sys::Maa;
 use std::{error::Error, sync::Mutex};
 
 const SERVER_VERSION: &str = "v0.1.0";

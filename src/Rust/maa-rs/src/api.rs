@@ -1,7 +1,6 @@
-use crate::{
-    database,
-    maa_sys::{self, Maa},
-};
+use crate::database;
+use maa_rs_sys::{self, Maa};
+
 use actix_web::{
     http::{header::ContentType, StatusCode},
     web, HttpResponse,
@@ -30,7 +29,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     run::config(cfg);
 }
 
-
 #[derive(Debug)]
 pub enum Error {
     Internal,
@@ -49,11 +47,12 @@ impl<T> From<PoisonError<T>> for Error {
     }
 }
 
-impl From<maa_sys::Error> for Error {
-    fn from(_: maa_sys::Error) -> Self {
+impl From<maa_rs_sys::Error> for Error {
+    fn from(_: maa_rs_sys::Error) -> Self {
         Self::Internal
     }
 }
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)

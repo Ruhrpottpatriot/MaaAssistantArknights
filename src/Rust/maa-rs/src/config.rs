@@ -8,7 +8,7 @@ lazy_static! {
     pub static ref CONFIG: Config = {
         let config_file = Path::new("./config.toml");
         if !config_file.exists() {
-            let default_config = include_str!("../config.toml");
+            let default_config = include_str!("../../config.toml");
             fs::write(config_file, default_config).unwrap();
         }
         let s = fs::read_to_string(config_file).unwrap();

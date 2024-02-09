@@ -9,7 +9,7 @@ use std::{
     ffi::{c_char, c_int, c_void, CStr, CString, NulError},
 };
 
-include!("./maa_sys/bind.rs");
+include!("./bind.rs");
 
 #[derive(Debug)]
 pub enum Error {

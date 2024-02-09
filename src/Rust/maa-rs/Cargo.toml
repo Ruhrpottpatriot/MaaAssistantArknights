@@ -1,0 +1,20 @@
+[package]
+authors = ["yuanyan3060", "Ruhrpottpatriot"]
+name = "maa-rs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+maa-rs_sys = { path = "../maa-rs_sys" }
+actix-web = "4.1.0"
+chrono = "0.4.19"
+lazy_static = "1.4.0"
+serde = { version = "1.0.140", features = ["derive"] }
+serde_with = "3.6"
+serde_json = "1.0.82"
+toml = "0.8"
+sled = "0.34.7"
+tracing = "0.1.35"
+tracing-subscriber = "0.3.15"
+pretty_assertions = "1.4"

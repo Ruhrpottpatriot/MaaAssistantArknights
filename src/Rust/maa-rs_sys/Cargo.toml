@@ -1,0 +1,15 @@
+[package]
+name = "maa-rs_sys"
+version = "0.0.0"
+edition = "2021"
+build = "build.rs"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pretty_assertions = "1.4"
+thiserror = { workspace = true }
+
+[build-dependencies]
+bindgen = "0.69"
