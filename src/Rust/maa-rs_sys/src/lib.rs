@@ -26,6 +26,7 @@ use serde::Serialize;
 use std::{
     collections::{HashMap, HashSet},
     ffi::{c_char, c_void, CStr, CString, NulError},
+    path::Path,
 };
 
 /// Makes sure that as soon as a result without an error is used, the crate's
@@ -51,6 +52,9 @@ pub enum Error {
 
     #[error("Allocation failed in the backend")]
     AllocFailed,
+
+    #[error("The given contained non UTF-8 chars")]
+    InvalidPath,
 }
 
 /// Represents the key used to identify an option value
@@ -182,6 +186,72 @@ impl Assistant {
     /// The default callback function that just prints the message and the detail json
     pub fn default_callback(msg_id: MessageType, detail_json: &str) {
         println!("msg: {}: {}", msg_id, detail_json,);
+    }
+
+    /// Loads a resource from the given path
+    ///
+    /// Since paths on Windows might contain non UTF-8 characters, this function needs to
+    /// covert the path into bytes first, which might fail. On the other hand convert the
+    /// path to a C string. This is pretty straightworard on UNIX based systems, since
+    /// there paths are just a sequence of bytes. However, on Windows paths are either
+    /// passed as ASCII or UTF-16. Passing UTF-8 paths to the system is not supported.
+    /// Therefore we have to make a distinction between windows and unix, which means a
+    /// slight performance hit on non-UNIX systems. See:
+    /// * https://stackoverflow.com/questions/38948669/
+    /// * https://internals.rust-lang.org/t/pathbuf-to-cstring/12560
+    pub fn load_resource<P: AsRef<Path>>(path: P) -> Result<()> {
+        #[cfg(unix)]
+        fn to_bytes<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
+            use std::os::unix::ffi::OsStrExt;
+            Some(path.as_ref().as_os_str().as_bytes().to_vec())
+        }
+
+        #[cfg(not(unix))]
+        fn path_to_bytes<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
+            // On Windows, could use std::os::windows::ffi::OsStrExt to encode_wide(),
+            // but you end up with a Vec<u16> instead of a Vec<u8>, so that doesn't
+            // really help.
+            path.as_ref()
+                .to_str()
+                .map(|s| s.as_bytes())
+                .map(|b| b.to_vec())
+        }
+
+        let path = path_to_bytes(path).ok_or(Error::InvalidPath)?;
+        let path = CString::new(path)?;
+
+        // Safety: The path pointer is guaranteed to be valid and null-terminated
+        let return_code = unsafe { AsstLoadResource(path.as_ptr()) };
+        match return_code {
+            1 => Ok(()),
+            _ => Err(Error::Unknown),
+        }
+    }
+
+    pub fn set_static_option(option: OptionKey, value: &str) -> Result<()> {
+        let c_option_value = CString::new(value)?;
+
+        // Safety: The string is guaranteed to be null-terminated and valid since it was
+        // created in safe rust with no errors.
+        let return_code = unsafe { AsstSetStaticOption(option.0, c_option_value.as_ptr()) };
+        if return_code == 1 {
+            Ok(())
+        } else {
+            Err(Error::Unknown)
+        }
+    }
+
+    pub fn set_working_directory(path: &str) -> Result<()> {
+        let c_path = CString::new(path)?;
+
+        // Safety: The string is guaranteed to be null-terminated and valid since it was
+        // created in safe rust with no errors.
+        let return_code = unsafe { AsstSetUserDir(c_path.as_ptr()) };
+        if return_code == 1 {
+            Ok(())
+        } else {
+            Err(Error::Unknown)
+        }
     }
 
     pub fn set_option(&mut self, option: OptionKey, value: &str) -> Result<()> {
