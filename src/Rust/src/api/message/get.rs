@@ -14,7 +14,7 @@ pub struct Req {
 
 pub async fn get(req: web::Json<Req>) -> Result<impl Responder, Error> {
     let nums = req.nums.unwrap_or(i64::MAX);
-    let msgs = database::msg::get_last_msg(&req.uuid, nums as usize).map_err(|_| Error::Internal)?;
+    let msgs = database::get_last_msg(&req.uuid, nums as usize).map_err(|_| Error::Internal)?;
     let mut ret: Vec<Value> = Vec::new();
     for x in msgs {
         ret.push(json!({

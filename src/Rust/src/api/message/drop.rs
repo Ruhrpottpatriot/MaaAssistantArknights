@@ -12,7 +12,7 @@ pub struct Req {
 }
 
 pub async fn drop(req: web::Json<Req>) -> Result<impl Responder, Error> {
-    database::msg::drop(&req.uuid).map_err(|_|Error::Internal)?;
+    database::drop(&req.uuid).map_err(|_|Error::Internal)?;
     Ok(HttpResponse::Ok().json(json!({
         "result":  0,
     })))

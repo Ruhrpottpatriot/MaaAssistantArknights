@@ -14,7 +14,7 @@ const SERVER_VERSION:&str="v0.0.1";
 fn main() -> std::io::Result<()> {
     Maa::load_resource(&CONFIG.resource.path).unwrap();
     if CONFIG.database.drop_on_start_up{
-        database::msg::drop_all().unwrap();
+        database::drop_all().unwrap();
     }
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
