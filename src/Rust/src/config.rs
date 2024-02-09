@@ -6,14 +6,13 @@ use std::path::Path;
 
 lazy_static! {
     pub static ref CONFIG: Config = {
-        let config_file = Path::new("./server_config.json");
+        let config_file = Path::new("./config.toml");
         if !config_file.exists() {
-            let default_config = include_str!("../server_config.json");
+            let default_config = include_str!("../config.toml");
             fs::write(config_file, default_config).unwrap();
         }
-        let s = fs::read(config_file).unwrap();
-        let r: Config = serde_json::from_slice(&s).unwrap();
-        r
+        let s = fs::read_to_string(config_file).unwrap();
+        toml::from_str(&s).unwrap()
     };
 }
 

@@ -1,22 +1,21 @@
 #![allow(dead_code)]
 
-mod maa_sys;
-mod database;
 mod api;
 mod config;
+mod database;
+mod maa_sys;
 
+use actix_web::{middleware, rt, web, App, HttpServer};
 use config::CONFIG;
-use std::sync::Mutex;
 use maa_sys::Maa;
-use actix_web::{middleware, rt, App, HttpServer, web};
+use std::{error::Error, sync::Mutex};
 
+const SERVER_VERSION: &str = "v0.1.0";
 
-const SERVER_VERSION:&str="v0.1.0";
-
-fn main() -> std::io::Result<()> {
+fn main() -> Result<(), Box<dyn Error>> {
     Maa::load_resource(&CONFIG.resource.path).unwrap();
 
-    if CONFIG.database.drop_on_start_up{
+    if CONFIG.database.drop_on_start_up {
         database::drop_all().unwrap();
     }
 
@@ -26,15 +25,17 @@ fn main() -> std::io::Result<()> {
 
     let maa_manager = web::Data::new(Mutex::new(api::MaaManager::new()));
 
-    rt::System::new().block_on(async {
-        HttpServer::new(move|| {
-            App::new()
-                .app_data(maa_manager.clone())
-                .wrap(middleware::Logger::default())
-                .configure(api::config)
+    rt::System::new()
+        .block_on(async {
+            HttpServer::new(move || {
+                App::new()
+                    .app_data(maa_manager.clone())
+                    .wrap(middleware::Logger::default())
+                    .configure(api::config)
+            })
+            .bind((CONFIG.server.address, CONFIG.server.port))?
+            .run()
+            .await
         })
-        .bind((CONFIG.server.address, CONFIG.server.port))?
-        .run()
-        .await
-    })
+        .map_err(std::io::Error::into)
 }
