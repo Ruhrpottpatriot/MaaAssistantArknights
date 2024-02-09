@@ -672,7 +672,22 @@ pub fn set_static_option(option: OptionKey, value: &str) -> Result<()> {
     }
 }
 
-pub fn set_working_directory(path: &str) -> Result<()> {
+/// Sets the working directory of the MAA backend
+/// 
+/// The working directory is the directory where the backend stores the log files or looks
+/// up cache entries.
+/// 
+/// # Parameters
+/// * `path` - The path to the new working directory
+/// 
+/// # Examples
+/// ```rust, ignore
+/// use maa_rs_sys::set_working_directory;
+/// 
+/// set_working_directory("/path/to/working/directory");
+/// ```
+pub fn set_working_directory<P: AsRef<Path>>(path: P) -> Result<()> {
+    let path = path_to_bytes(path).ok_or(Error::InvalidPath)?;
     let c_path = CString::new(path)?;
 
     // Safety: The string is guaranteed to be null-terminated and valid since it was
