@@ -176,7 +176,7 @@ impl Maa {
         &mut self,
         adb_path: &str,
         address: &str,
-        config: Option<&str>,
+        config: Option<String>,
     ) -> Result<i32, Error> {
         if self.handle.is_null() {
             return Err(Error::Null);
