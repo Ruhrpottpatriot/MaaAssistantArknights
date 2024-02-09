@@ -602,34 +602,7 @@ impl Drop for Assistant {
 }
 
 /// Loads a resource from the given path
-///
-/// Since paths on Windows might contain non UTF-8 characters, this function needs to
-/// covert the path into bytes first, which might fail. On the other hand convert the
-/// path to a C string. This is pretty straightworard on UNIX based systems, since
-/// there paths are just a sequence of bytes. However, on Windows paths are either
-/// passed as ASCII or UTF-16. Passing UTF-8 paths to the system is not supported.
-/// Therefore we have to make a distinction between windows and unix, which means a
-/// slight performance hit on non-UNIX systems. See:
-/// * https://stackoverflow.com/questions/38948669/
-/// * https://internals.rust-lang.org/t/pathbuf-to-cstring/12560
 pub fn load_resource<P: AsRef<Path>>(path: P) -> Result<()> {
-    #[cfg(unix)]
-    fn to_bytes<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
-        use std::os::unix::ffi::OsStrExt;
-        Some(path.as_ref().as_os_str().as_bytes().to_vec())
-    }
-
-    #[cfg(not(unix))]
-    fn path_to_bytes<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
-        // On Windows, could use std::os::windows::ffi::OsStrExt to encode_wide(),
-        // but you end up with a Vec<u16> instead of a Vec<u8>, so that doesn't
-        // really help.
-        path.as_ref()
-            .to_str()
-            .map(|s| s.as_bytes())
-            .map(|b| b.to_vec())
-    }
-
     let path = path_to_bytes(path).ok_or(Error::InvalidPath)?;
     let path = CString::new(path)?;
 
@@ -723,4 +696,33 @@ pub fn log(level_str: &str, message: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Since paths on Windows might contain non UTF-8 characters, this function needs to
+/// covert the path into bytes first, which might fail. On the other hand convert the
+/// path to a C string. This is pretty straightworard on UNIX based systems, since
+/// there paths are just a sequence of bytes. However, on Windows paths are either
+/// passed as ASCII or UTF-16. Passing UTF-8 paths to the system is not supported.
+/// Therefore we have to make a distinction between windows and unix, which means a
+/// slight performance hit on non-UNIX systems.
+///
+/// See:
+/// * https://stackoverflow.com/questions/38948669/
+/// * https://internals.rust-lang.org/t/pathbuf-to-cstring/12560
+fn path_to_bytes<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        Some(path.as_ref().as_os_str().as_bytes().to_vec())
+    }
+
+    #[cfg(not(unix))]
+    {
+        // On Windows, could use std::os::windows::ffi::OsStrExt to encode_wide(),
+        // but you end up with a Vec<u16> instead of a Vec<u8>, so that doesn't
+        // really help.
+        path.as_ref()
+            .to_str()
+            .map(|s| s.as_bytes().to_vec())
+    }
 }
