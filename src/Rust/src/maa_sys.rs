@@ -3,7 +3,7 @@ use std::{
     ffi::c_void,
 };
 
-include!("./bind.rs");
+include!("./maa_sys/bind.rs");
 
 #[derive(Debug)]
 pub enum Error {

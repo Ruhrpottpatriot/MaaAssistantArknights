@@ -2,6 +2,7 @@ use std::{collections::HashMap, ffi::c_void};
 use actix_web::{web, HttpResponse, http::{StatusCode, header::ContentType}};
 use serde_json::json;
 use crate::{maa_sys::{Maa, self}, database};
+
 mod instances;
 mod connect;
 mod message;
@@ -10,6 +11,7 @@ mod device;
 mod task;
 mod uuid;
 mod run;
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     instances::config(cfg);
     connect::config(cfg);
