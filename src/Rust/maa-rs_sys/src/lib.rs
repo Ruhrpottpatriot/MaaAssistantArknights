@@ -28,6 +28,7 @@ use std::{
     ffi::{c_char, c_void, CStr, CString, NulError},
     path::Path,
 };
+use strum::EnumString;
 
 /// Makes sure that as soon as a result without an error is used, the crate's
 /// error type is used.
@@ -684,15 +685,45 @@ pub fn set_working_directory(path: &str) -> Result<()> {
     }
 }
 
-/// Passes the given log message to the underlying MAA instance
-pub fn log(level_str: &str, message: &str) -> Result<()> {
-    let c_level_str = CString::new(level_str)?;
-    let c_message = CString::new(message)?;
+/// Enumerates the posdible log levels for the MAA backend
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, EnumString, strum::Display)]
+pub enum LogLevel {
+    #[strum(serialize = "TRC")]    
+    Trace,
+
+    #[strum(serialize = "DBG")]
+    Debug,
+
+    #[strum(serialize = "INF")]
+    Info,
+
+    #[strum(serialize = "WRN")]
+    Warn,
+
+    #[strum(serialize = "ERR")]
+    Error,
+}
+
+/// Logs a message with the backend
+/// 
+/// # Parameters
+/// * `level` - The log level of the message
+/// * `message` - The message to log
+/// 
+/// # Examples
+/// ```rust, ignore
+/// use maa_rs_sys::{log, LogLevel};
+/// 
+/// log(LogLevel::Info, "This is an info message");
+/// ```
+pub fn log(level: LogLevel, message: &str) -> Result<()> {
+    let level = CString::new(level.to_string())?;
+    let message = CString::new(message)?;
 
     // Safety: The strings are guaranteed to be null-terminated and valid since they
     // were created in safe code with no errors.
     unsafe {
-        AsstLog(c_level_str.as_ptr(), c_message.as_ptr());
+        AsstLog(level.as_ptr(), message.as_ptr());
     }
 
     Ok(())
@@ -721,8 +752,6 @@ fn path_to_bytes<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
         // On Windows, could use std::os::windows::ffi::OsStrExt to encode_wide(),
         // but you end up with a Vec<u16> instead of a Vec<u8>, so that doesn't
         // really help.
-        path.as_ref()
-            .to_str()
-            .map(|s| s.as_bytes().to_vec())
+        path.as_ref().to_str().map(|s| s.as_bytes().to_vec())
     }
 }
