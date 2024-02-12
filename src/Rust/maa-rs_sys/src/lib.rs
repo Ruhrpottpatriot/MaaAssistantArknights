@@ -214,13 +214,6 @@ impl Assistant {
         })
     }
 
-    /// Gets the size of an object when it was not properly read
-    /// BUG: On the C/C++ side this is defined as the number _-1_,
-    /// however an u64 can never have that value
-    pub fn get_null_size() -> u64 {
-        unsafe { AsstGetNullSize() }
-    }
-
     /// The default callback function that just prints the message and the detail json
     pub fn default_callback(msg_id: MessageType, detail_json: &str) {
         println!("msg: {}: {}", msg_id, detail_json,);
@@ -432,6 +425,8 @@ impl Assistant {
 
         let mut buff_size = 2 * 1920 * 1080 * 4;
         loop {
+            // This is the maximum size of out buffer and always << 2^32, so it will never
+            // overflow, even if we're using usize on x86
             if buff_size > 10 * 1920 * 1080 * 4 {
                 return Err(Error::TooLargeAlloc);
             }
@@ -444,21 +439,16 @@ impl Assistant {
                     self.handle,
                     buff.as_mut_ptr() as *mut c_void,
                     buff_size as u64,
-                )
+                ) as usize
             };
-            if data_size == Self::get_null_size() {
+            if !is_valid_size(data_size) {
                 buff_size *= 2;
                 continue;
             }
 
-            let data_size = data_size as usize;
-            if data_size > buff.capacity() {
-                return Err(Error::TooLargeAlloc);
-            }
-
             // Safety: The new length of the buffer is guaranteed to be a valid size
-            unsafe { buff.set_len(data_size as usize) };
-            buff.resize(data_size as usize, 0);
+            unsafe { buff.set_len(data_size) };
+            buff.resize(data_size, 0);
             return Ok(buff);
         }
     }
@@ -586,23 +576,20 @@ impl Assistant {
             // Safety:
             // * The handle is never null at this point
             // * The buffer is guaranteed to be valid
-            let data_size =
-                unsafe { AsstGetTasksList(self.handle, buff.as_mut_ptr(), buff_size as u64) };
+            let data_size = unsafe {
+                AsstGetTasksList(self.handle, buff.as_mut_ptr(), buff_size as u64) as usize
+            };
 
-            if data_size == Self::get_null_size() {
+            if !is_valid_size(data_size) {
+                // TODO: Replace the growing factor with 1.5
                 buff_size *= 2;
                 continue;
-            }
-
-            let data_size = data_size as usize;
-            if data_size > buff.capacity() {
-                return Err(Error::TooLargeAlloc);
             }
 
             // Safety: The new length of the buffer is guaranteed to be a valid size
             unsafe { buff.set_len(data_size) };
 
-            buff.resize(data_size as usize, 0);
+            buff.resize(data_size, 0);
 
             let mut task_ids = HashSet::with_capacity(buff.len());
 
@@ -611,6 +598,7 @@ impl Assistant {
                 task_ids.insert(i);
             }
 
+            // Update cached tasks
             self.tasks.retain(|k, _| task_ids.contains(k));
 
             return Ok(&self.tasks);
@@ -830,6 +818,20 @@ fn path_to_bytes<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
         path.as_ref().to_str().map(|s| s.as_bytes().to_vec())
     }
 }
+
+/// Gets the size of an object when it was not properly read
+///
+/// BUG: On the C/C++ side this is defifned as the number _-1_,
+/// however an u64 (or an uint64_t on the FFI side) can never have that value and will
+/// wrap arount to u64::MAX
+fn is_valid_size(size: usize) -> bool {
+    // Safety: This call should never fail, as there are no parameters passed to it.
+    let null_size = unsafe { AsstGetNullSize() };
+
+    // We can always cast an usize to an u64, as _usize <= u64_ always holds
+    size as u64 != null_size
+}
+
 /// Tests if the return code of the backend call is "true"
 ///
 /// # Parameters
