@@ -58,6 +58,10 @@ pub enum Error {
     #[error("The given contained non UTF-8 chars")]
     InvalidPath,
 
+    #[error("Could not serialize object to JSON")]
+    Serialize(#[from] serde_json::Error),
+}
+
 /// Represents the id of an asynchronous call
 pub struct AsyncCallId(pub(crate) bind::AsstAsyncCallId);
 
@@ -465,31 +469,40 @@ impl Assistant {
         }
 
         // Safety: The handle is never null at this point
-        let return_code = unsafe { AsstAsyncScreencap(self.handle, 1) };
-        match return_code {
-            0 => Err(Error::Unknown),
-            _ => Ok(()),
-        }
-    }
-
-    pub fn create_task(&mut self, type_: &str, params: &str) -> Result<TaskId> {
+    /// Creates a new task and appends it to the list of tasks
+    ///
+    /// # Parameters
+    /// * `task_type` - The type of the task to create
+    /// * `params` - The parameters for the task
+    pub fn create_task<S: Into<String>, T: Serialize>(
+        &mut self,
+        task_type: S,
+        params: &T,
+    ) -> Result<TaskId> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
 
-        let c_type = CString::new(type_)?;
-        let c_params = CString::new(params)?;
+        let task_type = task_type.into();
+
+        let type_ = CString::new(task_type.clone())?.as_ptr();
+        let params_json = serde_json::to_string(params)?;
+
+        // TODO: Find a better way than stupidly cloning the string
+        // If the AsstAppendTask function doesn't take ownership of the string, then we
+        // can get the original string back from it
+        let params = CString::new(params_json.clone())?.as_ptr();
 
         // Safety: The handle is never null at this point and the strings are guaranteed
         // to be valid and null-terminated
-        let task_id = unsafe { AsstAppendTask(self.handle, c_type.as_ptr(), c_params.as_ptr()) };
+        let task_id = unsafe { AsstAppendTask(self.handle, type_, params) };
         let task_id = TaskId(task_id);
         self.tasks.insert(
             task_id,
             Task {
                 id: task_id,
-                type_: type_.to_string(),
-                params: params.to_string(),
+                task_type: task_type,
+                params: params_json.to_string(),
             },
         );
 
