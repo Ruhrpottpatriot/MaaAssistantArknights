@@ -32,6 +32,9 @@
 pub(crate) mod bind;
 use bind::*;
 
+mod types;
+use types::*;
+
 use derive_more::Display;
 use serde::Serialize;
 use std::{
@@ -39,6 +42,7 @@ use std::{
     ffi::{c_char, c_void, CStr, CString, NulError},
     net::SocketAddr,
     path::Path,
+    ptr::null,
 };
 use strum::EnumString;
 
@@ -81,21 +85,6 @@ impl AsyncCallId {
     ///
     /// # Parameters
     /// * `id`:  The numerical id of the asynchronous call
-    pub fn new(id: i32) -> Self {
-        Self(id)
-    }
-}
-
-/// Represents the key used to identify an option value
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Display, Serialize)]
-#[repr(transparent)]
-pub struct OptionKey(pub(crate) bind::AsstStaticOptionKey);
-
-impl OptionKey {
-    /// Creates a new [`OptionKey`]
-    ///
-    /// # Parameters
-    /// * `id`:  The numerical id of the option
     pub fn new(id: i32) -> Self {
         Self(id)
     }
@@ -304,19 +293,38 @@ impl Assistant {
     /// Sets an option for the current instance
     ///
     /// # Parameters
-    /// * `option` - The key of the option to set
-    /// * `value` - The value to set the option
-    pub fn set_option(&mut self, option: OptionKey, value: &str) -> Result<()> {
+    /// * `option` - The option to set
+    pub fn set_option(&mut self, option: InstanceOption) -> Result<()> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
 
-        let value = CString::new(value)?;
+        fn get_bool_string(value: bool) -> *const c_char {
+            if value {
+                b"1".as_ptr().cast()
+            } else {
+                b"0".as_ptr().cast()
+            }
+        }
+
+        // Allow deprecated for backwards compatibility
+        #[allow(deprecated)]
+        let (key, value) = match option {
+            InstanceOption::MinitouchEnabled(enabled) => (1, get_bool_string(enabled)),
+            InstanceOption::TouchMode(mode) => {
+                let value = format!("{}", mode);
+                let value = CString::new(value)?.as_ptr();
+                (2, value)
+            }
+            InstanceOption::DeploymentWithPause(enabled) => (3, get_bool_string(enabled)),
+            InstanceOption::AdbLiteEnabled(enabled) => (4, get_bool_string(enabled)),
+            InstanceOption::KillAdbOnExit(enabled) => (5, get_bool_string(enabled)),
+        };
 
         // Safety:
         // * The handle is never null at this point
         // * The string is guaranteed to be null-terminated and valid since it was
-        let return_code = unsafe { AsstSetInstanceOption(self.handle, option.0, value.as_ptr()) };
+        let return_code = unsafe { AsstSetInstanceOption(self.handle, key, value) };
         is_success(return_code)
     }
 
@@ -803,21 +811,26 @@ pub fn get_version<'a>() -> Result<&'a str> {
 /// Sets a process wide option
 ///
 /// # Parameters
-/// * `option` - The key of the option to set
-/// * `value` - The value to set the option
+/// * `option` - The static option to set
 ///
 /// # Examples
 /// ```rust, ignore
 /// use maars::{set_static_option, StaticOptionKey};
 ///
-/// Assistant::set_static_option(OptionKey::new(1), "value");
+/// set_static_option(StaticOptionKey::CpuOCR);
 /// ```
-pub fn set_static_option<S: Into<String>>(option: OptionKey, value: S) -> Result<()> {
-    let c_option_value = CString::new(value.into())?;
+pub fn set_static_option<S: Into<String>>(option: StaticOption) -> Result<()> {
+    let (key, value) = match option {
+        StaticOption::CpuOCR => (1, null()),
+        StaticOption::GpuOCR { gpu_id } => {
+            let value = CString::new(gpu_id.to_string())?;
+            (2, value.as_ptr())
+        }
+    };
 
     // Safety: The string is guaranteed to be null-terminated and valid since it was
     // created in safe rust with no errors.
-    let return_code = unsafe { AsstSetStaticOption(option.0, c_option_value.as_ptr()) };
+    let return_code = unsafe { AsstSetStaticOption(key, value) };
     is_success(return_code)
 }
 
