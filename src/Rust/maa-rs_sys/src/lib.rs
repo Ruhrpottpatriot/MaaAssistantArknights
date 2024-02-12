@@ -266,6 +266,9 @@ impl Assistant {
         // * The handle is never null at this point
         // * The string is guaranteed to be null-terminated and valid since it was
         let return_code = unsafe { AsstSetInstanceOption(self.handle, option.0, value.as_ptr()) };
+        is_success(return_code)
+    }
+
     /// Asynchronously connects to an emulator at the given address
     ///
     /// # Parameters
@@ -566,10 +569,7 @@ impl Assistant {
 
         // Safety: The handle is never null at this point
         let return_code = unsafe { AsstStart(self.handle) };
-        match return_code {
-            1 => Ok(()),
-            _ => Err(Error::Unknown),
-        }
+        is_success(return_code)
     }
 
     /// Stops the currently running and all following tasks
@@ -580,10 +580,7 @@ impl Assistant {
 
         // Safety: The handle is never null at this point
         let return_code = unsafe { AsstStop(self.handle) };
-        match return_code {
-            1 => Ok(()),
-            _ => Err(Error::Unknown),
-        }
+        is_success(return_code)
     }
 
     /// Wraps the Rust callback so that it can be passed over C-FFI bounds to the backend
@@ -648,10 +645,7 @@ pub fn load_resource<P: AsRef<Path>>(path: P) -> Result<()> {
 
     // Safety: The path pointer is guaranteed to be valid and null-terminated
     let return_code = unsafe { AsstLoadResource(path.as_ptr()) };
-    match return_code {
-        1 => Ok(()),
-        _ => Err(Error::Unknown),
-    }
+    is_success(return_code)
 }
 
 /// Gets the current version of the MAA library
@@ -704,11 +698,7 @@ pub fn set_static_option(option: OptionKey, value: &str) -> Result<()> {
     // Safety: The string is guaranteed to be null-terminated and valid since it was
     // created in safe rust with no errors.
     let return_code = unsafe { AsstSetStaticOption(option.0, c_option_value.as_ptr()) };
-    if return_code == 1 {
-        Ok(())
-    } else {
-        Err(Error::Unknown)
-    }
+    is_success(return_code)
 }
 
 /// Sets the working directory of the MAA backend
@@ -732,11 +722,7 @@ pub fn set_working_directory<P: AsRef<Path>>(path: P) -> Result<()> {
     // Safety: The string is guaranteed to be null-terminated and valid since it was
     // created in safe rust with no errors.
     let return_code = unsafe { AsstSetUserDir(c_path.as_ptr()) };
-    if return_code == 1 {
-        Ok(())
-    } else {
-        Err(Error::Unknown)
-    }
+    is_success(return_code)
 }
 
 /// Enumerates the posdible log levels for the MAA backend
