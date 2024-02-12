@@ -428,6 +428,15 @@ impl Assistant {
         Ok(is_connected == 1)
     }
 
+    /// Navigates the game back to the home screen
+    pub fn navigate_home(&self) -> Result<()> {
+        if self.handle.is_null() {
+            return Err(Error::InvalidHandle);
+        }
+
+        // Safety: The handle is never null at this point
+        let return_code = unsafe { AsstBackToHome(self.handle) };
+        is_success(return_code)
     }
 
     /// Check if an instance of MAA is running
