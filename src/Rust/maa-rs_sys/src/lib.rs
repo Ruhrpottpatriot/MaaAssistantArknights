@@ -687,8 +687,8 @@ pub fn get_version<'a>() -> Result<&'a str> {
 ///
 /// Assistant::set_static_option(OptionKey::new(1), "value");
 /// ```
-pub fn set_static_option(option: OptionKey, value: &str) -> Result<()> {
-    let c_option_value = CString::new(value)?;
+pub fn set_static_option<S: Into<String>>(option: OptionKey, value: S) -> Result<()> {
+    let c_option_value = CString::new(value.into())?;
 
     // Safety: The string is guaranteed to be null-terminated and valid since it was
     // created in safe rust with no errors.
