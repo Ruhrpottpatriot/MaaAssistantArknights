@@ -553,9 +553,8 @@ impl Assistant {
     /// Get the current target address
     ///
     /// The target address is usually an IP, but can be anything
-    /// Question: Is the target address always an IP?
-    pub fn target(&self) -> Option<&str> {
-        self.target.as_deref()
+    pub fn target(&self) -> Option<SocketAddr> {
+        self.target
     }
 
     /// Gets a list of tasks that are currently configured

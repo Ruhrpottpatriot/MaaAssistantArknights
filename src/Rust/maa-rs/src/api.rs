@@ -6,7 +6,7 @@ use actix_web::{
     web, HttpResponse,
 };
 use serde_json::json;
-use std::{collections::HashMap, sync::PoisonError};
+use std::{collections::HashMap, net::SocketAddr, sync::PoisonError};
 
 mod connect;
 mod device;
@@ -107,7 +107,7 @@ impl MaaManager {
     pub fn get_mut(&mut self, id: i64) -> Option<&mut Assistant> {
         self.instances.get_mut(&id)
     }
-    pub fn target(&self, id: i64) -> Option<&str> {
+    pub fn target(&self, id: i64) -> Option<SocketAddr> {
         let maa = self.get(id)?;
         maa.target()
     }
