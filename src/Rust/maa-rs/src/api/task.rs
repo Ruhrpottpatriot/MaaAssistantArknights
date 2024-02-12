@@ -38,7 +38,7 @@ pub async fn all(id: Path<i64>, manager: ManagerData) -> Result<impl Responder, 
             tmp.insert(
                 k.to_string(),
                 json!({
-                    "type": v.type_,
+                    "type": v.task_type,
                     "params": v.params
                 }),
             );

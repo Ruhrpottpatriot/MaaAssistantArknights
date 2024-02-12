@@ -129,7 +129,12 @@ impl TaskId {
 #[derive(Debug, Clone)]
 pub struct Task {
     pub id: TaskId,
-    pub type_: String,
+
+    /// The type of the task
+    /// TODO: Convert the task type to a Rust enum
+    pub task_type: String,
+
+    /// The parameters for the task, serialized as a JSON string
     pub params: String,
 }
 
