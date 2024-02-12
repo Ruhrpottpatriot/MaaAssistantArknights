@@ -338,9 +338,9 @@ impl Assistant {
         since = "0.1.0",
         note = "This function is deprecated and will be removed in the next major version. Use `connect_async` instead."
     )]
-    pub fn connect<S: Into<String>>(
+    pub fn connect<P: AsRef<Path>, S: Into<String>>(
         &mut self,
-        adb_path: S,
+        adb_path: P,
         address: SocketAddr,
         config: Option<S>,
     ) -> Result<()> {
@@ -348,7 +348,8 @@ impl Assistant {
             return Err(Error::InvalidHandle);
         }
 
-        let c_adb_path = CString::new(adb_path.into())?;
+        let path_vec = path_to_bytes(adb_path).ok_or(Error::InvalidPath)?;
+        let c_adb_path = CString::new(path_vec)?;
 
         let c_address = CString::new(address.to_string())?;
         let c_cfg_ptr = match config {
@@ -384,9 +385,9 @@ impl Assistant {
     ///
     /// # Returns
     /// An [`AsyncCallId`] that can be used to identify the asynchronous call
-    pub fn connect_async<S: Into<String>>(
+    pub fn connect_async<P: AsRef<Path>, S: Into<String>>(
         &mut self,
-        adb_path: S,
+        adb_path: P,
         address: SocketAddr,
         config: Option<S>,
         block: bool,
@@ -395,7 +396,8 @@ impl Assistant {
             return Err(Error::InvalidHandle);
         }
 
-        let c_adb_path = CString::new(adb_path.into())?;
+        let path_vec = path_to_bytes(adb_path).ok_or(Error::InvalidPath)?;
+        let c_adb_path = CString::new(path_vec)?;
 
         let c_address = CString::new(address.to_string())?;
         let c_cfg_ptr = match config {
