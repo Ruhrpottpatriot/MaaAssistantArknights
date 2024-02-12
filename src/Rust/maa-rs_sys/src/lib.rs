@@ -368,10 +368,6 @@ impl Assistant {
     }
 
     /// Check if an instance of MAA is running
-    ///
-    /// # Safety
-    /// This function checks if the handle stored inside `self` is not null. If the handle
-    /// is null, the function will return false.
     pub fn running(&self) -> bool {
         if self.handle.is_null() {
             return false;
@@ -657,7 +653,7 @@ pub fn load_resource<P: AsRef<Path>>(path: P) -> Result<()> {
 /// let version = get_version().unwrap();
 /// println!("The version of the MAA library is: {}", version);
 /// ```
-pub fn get_version() -> Result<String> {
+pub fn get_version<'a>() -> Result<&'a str> {
     // Safety: The version string pointer is checked to be non-null. However, no
     // guarantees can be made at this point whether the string contains a
     // null-terminator.
@@ -675,9 +671,8 @@ pub fn get_version() -> Result<String> {
     };
 
     // Throw an error instead of replacing invalid utf8 characters
-    // TODO: Return a reference instead of a cloned string
     // TODO: The returned version is should be a SemVer  struct
-    Ok(version.to_str()?.to_string())
+    version.to_str().map_err(Error::from)
 }
 
 /// Sets a process wide option

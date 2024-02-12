@@ -1,6 +1,6 @@
 use super::Error;
 use actix_web::{get, web, HttpResponse, Responder};
-use maa_rs_sys::{Assistant,get_version};
+use maa_rs_sys::get_version;
 use serde::Serialize;
 use serde_json::json;
 
