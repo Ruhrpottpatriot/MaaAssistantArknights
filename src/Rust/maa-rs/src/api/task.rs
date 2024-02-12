@@ -6,6 +6,7 @@ use actix_web::{
     web::{self, Json, Path},
     HttpResponse, Responder,
 };
+use maa_rs_sys::TaskId;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{collections::HashMap, sync::Mutex};
@@ -43,7 +44,7 @@ pub async fn all(id: Path<i64>, manager: ManagerData) -> Result<impl Responder, 
                 }),
             );
         }
-        
+
         tmp
     };
 
@@ -79,7 +80,9 @@ pub async fn set(
         Value::Object(_) => body.params.to_string(),
         _ => return Err(Error::InvalidRequest),
     };
-    maa.set_task(body.task_id, &params)?;
+
+    let task_id = TaskId::new(body.task_id);
+    maa.set_task_parameters(task_id, &params)?;
 
     Ok(HttpResponse::Ok().finish())
 }

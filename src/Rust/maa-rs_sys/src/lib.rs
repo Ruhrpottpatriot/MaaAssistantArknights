@@ -518,22 +518,32 @@ impl Assistant {
         Ok(task_id)
     }
 
-    pub fn set_task(&self, id: i32, params: &str) -> Result<()> {
+    /// Sets the parameters for a task
+    ///
+    /// Parameters for a task can be set at any time, but some parameters are only
+    /// evaluated at the start of the task. These parameters are marked with the "Editing
+    /// in run-time is not supported" comment in the MAA documentation and any change to
+    /// them that occurs during the runtime of a task will be ignored.
+    ///
+    /// # Parameters
+    /// * `id` - The id of the task to set the parameters for
+    /// * `params` - The parameters to set.
+    pub fn set_task_parameters<T>(&self, id: TaskId, params: &T) -> Result<()>
+    where
+        T: Serialize,
+    {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
 
-        let c_params = CString::new(params)?;
+        let params = serde_json::to_string(params)?;
+        let params = CString::new(params)?.as_ptr();
 
         // Safety: The handle is never null at this point and the string is guaranteed to
         // be valid and null-terminated
-        let return_code = unsafe { AsstSetTaskParams(self.handle, id, c_params.as_ptr()) };
-        match return_code {
-            1 => Ok(()),
-            _ => Err(Error::Unknown),
-        }
+        let return_code = unsafe { AsstSetTaskParams(self.handle, id.0, params) };
+        is_success(return_code)
     }
-
     pub fn uuid(&mut self) -> Result<&str> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
