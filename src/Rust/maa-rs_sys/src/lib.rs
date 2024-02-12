@@ -409,20 +409,23 @@ impl Assistant {
     }
 
     /// Clicks on the screen at the given coordinates
-    pub fn click(&self, x: i32, y: i32) -> Result<i32> {
+    ///
+    /// # Parameters
+    /// * `x` - The x coordinate of the click
+    /// * `y` - The y coordinate of the click
+    /// * `block` - If true, the function will block until the click is done.
+    ///
+    /// # Returns
+    /// An [`AsyncCallId`] that can be used to identify the asynchronous call
+    pub fn click_async(&self, x: i32, y: i32, block: bool) -> Result<AsyncCallId> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
 
         // Safety: The handle is never null at this point
-        let return_code = unsafe { AsstAsyncClick(self.handle, x, y, 0) };
-        if return_code != 0 {
-            Ok(return_code)
-        } else {
-            Err(Error::Unknown)
-        }
+        let async_call_id = unsafe { AsstAsyncClick(self.handle, x, y, block.into()) };
+        Ok(AsyncCallId(async_call_id))
     }
-
     pub fn screenshot(&self) -> Result<Vec<u8>> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);

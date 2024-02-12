@@ -40,7 +40,7 @@ pub async fn click(
     let _return_code = manager
         .get(id.into_inner())
         .ok_or(Error::InstanceNotFound)?
-        .click(req.x, req.y)?;
+        .click_async(req.x, req.y, false)?;
 
     Ok(HttpResponse::Ok().finish())
 }
