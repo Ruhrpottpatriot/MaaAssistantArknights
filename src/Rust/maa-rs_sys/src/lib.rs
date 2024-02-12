@@ -1,11 +1,22 @@
-//! maa-rs_sy is the main crate the provides rust bindings to the exported
-//! interface provided by MAA. It aims to give users an _unsafe-free_ api they
-//! can use in their Rust applications.
+//! maa-rs_sy is the main crate the provides rust bindings to the exported interface
+//! provided by MAA. It aims to give users an _unsafe-free_ api they can use in their
+//! Rust applications.
 //!
-//! This create also contains wrappers around most types to make them secure and
-//! add more features to them that are interesting to Rust users, e.g. numerical
-//! id's, such as being equatable, comparable and cloneable, which
-//! the original FFI type might not be.
+//! This create also contains wrappers around most types to make them secure and add
+//! more features to them that are interesting to Rust users, e.g. numerical id's, such
+//! as being equatable, comparable and cloneable, which the original FFI type might not
+//! be.
+//!
+//! This crate differs from the maa-sys crate found in the maa-cli project. That crate
+//! still exposes some FFI types to the user, which this crate deliberately avoids.
+//! However, the above mentioned maa-sys crate uses
+//! [libloading](https://docs.rs/libloading/latest/libloading/index.html) to load the
+//! MAA library. Libloading would allow a dynamic loading of the core MAA library
+//! without having to know the exact path of the library files.
+//! This might be a suitable approach compared to the manual linking of this library
+//! against the C/C++ MAA library.
+//! Furthermore, there are some bugs and incorrect choices in the library, most notably
+//! around paths on windows.
 
 #![warn(
     clippy::missing_safety_doc,
@@ -290,6 +301,11 @@ impl Assistant {
         }
     }
 
+    /// Sets an option for the current instance
+    ///
+    /// # Parameters
+    /// * `option` - The key of the option to set
+    /// * `value` - The value to set the option
     pub fn set_option(&mut self, option: OptionKey, value: &str) -> Result<()> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
@@ -426,6 +442,8 @@ impl Assistant {
         let async_call_id = unsafe { AsstAsyncClick(self.handle, x, y, block.into()) };
         Ok(AsyncCallId(async_call_id))
     }
+
+    /// Gets a previously taken screenshot as PNG data
     pub fn screenshot(&self) -> Result<Vec<u8>> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
@@ -544,6 +562,20 @@ impl Assistant {
         let return_code = unsafe { AsstSetTaskParams(self.handle, id.0, params) };
         is_success(return_code)
     }
+
+    /// Gets theunique identifier for the current instance
+    ///
+    /// This function queries the backend, if the uuid is not already set. Otherwise it
+    /// returns the cached value.
+    ///
+    /// # Examples
+    /// ```rust, ignore
+    /// use maa_rs_sys::Assistant;
+    ///
+    /// let mut assistant = Assistant::new(None).unwrap();
+    /// let uuid = assistant.uuid().unwrap();
+    /// println!("The uuid of the current instance is: {}", uuid);
+    /// ```
     pub fn uuid(&mut self) -> Result<&str> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
@@ -756,7 +788,8 @@ pub fn set_static_option<S: Into<String>>(option: OptionKey, value: S) -> Result
 /// Sets the working directory of the MAA backend
 ///
 /// The working directory is the directory where the backend stores the log files or looks
-/// up cache entries.
+/// up cache entries. If these methods are intended to be used, then this method needs to
+/// be called beforehand.
 ///
 /// # Parameters
 /// * `path` - The path to the new working directory
