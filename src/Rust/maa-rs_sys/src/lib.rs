@@ -453,12 +453,23 @@ impl Assistant {
         }
     }
 
-    pub fn take_screenshot(&mut self) -> Result<()> {
+    /// Takes a screenshot
+    ///
+    /// # Parameters
+    /// * `block` - If true, the function will block until the screenshot is taken
+    ///
+    /// # Returns
+    /// An [`AsyncCallId`] that can be used to identify the asynchronous call
+    pub fn take_screenshot_async(&mut self, block: bool) -> Result<AsyncCallId> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
 
         // Safety: The handle is never null at this point
+        let async_call_id = unsafe { AsstAsyncScreencap(self.handle, block.into()) };
+        Ok(AsyncCallId(async_call_id))
+    }
+
     /// Creates a new task and appends it to the list of tasks
     ///
     /// # Parameters
