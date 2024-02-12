@@ -411,6 +411,23 @@ impl Assistant {
         self.target = Some(address);
         Ok(AsyncCallId(async_call_id))
     }
+
+    /// Checks wether the current instance is connected to an amulator
+    pub fn connected(&self) -> Result<bool> {
+        if self.handle.is_null() {
+            return Err(Error::InvalidHandle);
+        }
+
+        // If the target is not set, then the `connect_async` method was never called
+        if self.target.is_none() {
+            return Ok(false);
+        }
+
+        // Safety: The handle is never null at this point
+        let is_connected = unsafe { AsstConnected(self.handle) };
+        Ok(is_connected == 1)
+    }
+
     }
 
     /// Check if an instance of MAA is running
