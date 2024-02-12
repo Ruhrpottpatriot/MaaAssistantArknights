@@ -584,6 +584,9 @@ impl Assistant {
         if self.uuid.is_none() {
             let mut buff_size = 1024;
             loop {
+                // This is the maximum size of out buffer.
+                // NOTE: This value is << 2^32, so it will never overflow even if we're
+                // using usize on x86
                 if buff_size > 1024 * 1024 {
                     return Err(Error::TooLargeAlloc);
                 }
@@ -593,16 +596,20 @@ impl Assistant {
                 // * The handle is never null at this point
                 // * The buffer is guaranteed to be valid
                 let data_size = unsafe {
-                    AsstGetUUID(self.handle, buff.as_mut_ptr() as *mut i8, buff_size as u64)
+                    let buff = buff.as_mut_ptr() as *mut i8;
+                    AsstGetUUID(self.handle, buff, buff_size as u64) as usize
                 };
-                if data_size == Self::get_null_size() {
+                if !is_valid_size(data_size) {
+                    // Resizing a buffer will always leave a region of unused memory in
+                    // front of the reallocated buffer. If the growth rate is too high,
+                    // then this region of memory might be unusable in the buffer. With a
+                    // factor of 2 this is ALWAYS the case, resulting in wasted space and
+                    // additional allocations. It's mathematically proveable that a factor
+                    // of 2 is the worst possible growth rate. See:
+                    // https://github.com/facebook/folly/blob/main/folly/docs/FBVector.md
+                    // TODO: Replace the factor with 1.5
                     buff_size *= 2;
                     continue;
-                }
-
-                let data_size = data_size as usize;
-                if data_size > buff.capacity() {
-                    return Err(Error::TooLargeAlloc);
                 }
 
                 // Safety: The new length of the buffer is guaranteed to be a valid size
@@ -611,7 +618,10 @@ impl Assistant {
             }
         }
 
-        Ok(self.uuid.as_deref().expect("The uuid was set just above and therefore is guaranteed to be valid."))
+        Ok(self
+            .uuid
+            .as_deref()
+            .expect("The uuid was set just above and therefore is guaranteed to be valid."))
     }
 
     /// Get the current target address
