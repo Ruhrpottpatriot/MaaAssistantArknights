@@ -1,5 +1,5 @@
 use crate::database;
-use maa_rs_sys::{self, Assistant};
+use maars::{self, Assistant};
 
 use actix_web::{
     http::{header::ContentType, StatusCode},
@@ -47,8 +47,8 @@ impl<T> From<PoisonError<T>> for Error {
     }
 }
 
-impl From<maa_rs_sys::Error> for Error {
-    fn from(_: maa_rs_sys::Error) -> Self {
+impl From<maars::Error> for Error {
+    fn from(_: maars::Error) -> Self {
         Self::Internal
     }
 }

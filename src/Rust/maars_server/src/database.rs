@@ -1,6 +1,6 @@
 use crate::CONFIG;
 use lazy_static::lazy_static;
-use maa_rs_sys::MessageType;
+use maars::MessageType;
 use serde_json::Value;
 use std::{
     path::PathBuf,

@@ -5,8 +5,8 @@ use std::{env, path::PathBuf};
 
 fn main() {
     // Make cargo look for shared libraries in the folder two levels up
-    // println!("cargo:rustc-link-search=native=../..");
-    // println!("cargo:rustc-link-lib=MaaCore");
+    println!("cargo:rustc-link-search=native=./maars");
+    println!("cargo:rustc-link-lib=MaaCore");
 
     // Assume that the header file for rust-bindgen is located in the main
     // MAA project folder, which is three levels up from the current build file

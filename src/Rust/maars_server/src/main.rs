@@ -6,7 +6,7 @@ mod database;
 
 use actix_web::{middleware, rt, web, App, HttpServer};
 use config::CONFIG;
-use maa_rs_sys::load_resource;
+use maars::load_resource;
 use std::{error::Error, sync::Mutex};
 
 

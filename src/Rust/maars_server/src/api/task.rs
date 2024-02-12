@@ -6,7 +6,7 @@ use actix_web::{
     web::{self, Json, Path},
     HttpResponse, Responder,
 };
-use maa_rs_sys::TaskId;
+use maars::TaskId;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{collections::HashMap, sync::Mutex};

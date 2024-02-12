@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "maa-rs",
-    "maa-rs_sys"
+    "maars",
+    "maars_server"
 ]
 
 [workspace.dependencies]

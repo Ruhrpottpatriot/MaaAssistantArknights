@@ -596,7 +596,7 @@ impl Assistant {
     ///
     /// # Examples
     /// ```rust, ignore
-    /// use maa_rs_sys::Assistant;
+    /// use maars::Assistant;
     ///
     /// let mut assistant = Assistant::new(None).unwrap();
     /// let uuid = assistant.uuid().unwrap();
@@ -773,7 +773,7 @@ pub fn load_resource<P: AsRef<Path>>(path: P) -> Result<()> {
 ///
 /// # Examples
 /// ```rust, ignore
-/// use maa_rs_sys::get_version;
+/// use maars::get_version;
 ///
 /// let version = get_version().unwrap();
 /// println!("The version of the MAA library is: {}", version);
@@ -808,7 +808,7 @@ pub fn get_version<'a>() -> Result<&'a str> {
 ///
 /// # Examples
 /// ```rust, ignore
-/// use maa_rs_sys::{Assistant, OptionKey};
+/// use maars::{set_static_option, StaticOptionKey};
 ///
 /// Assistant::set_static_option(OptionKey::new(1), "value");
 /// ```
@@ -832,7 +832,7 @@ pub fn set_static_option<S: Into<String>>(option: OptionKey, value: S) -> Result
 ///
 /// # Examples
 /// ```rust, ignore
-/// use maa_rs_sys::set_working_directory;
+/// use maars::set_working_directory;
 ///
 /// set_working_directory("/path/to/working/directory");
 /// ```
@@ -873,7 +873,7 @@ pub enum LogLevel {
 ///
 /// # Examples
 /// ```rust, ignore
-/// use maa_rs_sys::{log, LogLevel};
+/// use maars::{log, LogLevel};
 ///
 /// log(LogLevel::Info, "This is an info message");
 /// ```
@@ -937,7 +937,7 @@ fn is_valid_size(size: usize) -> bool {
 ///
 /// # Examples
 /// ```rust, ignore
-/// use maa_rs_sys::check_return_code;
+/// use maars::check_return_code;
 ///
 /// let return_code: AsstBool = 1;
 /// let actual = check_return_code(return_code);
@@ -946,7 +946,7 @@ fn is_valid_size(size: usize) -> bool {
 /// ```
 ///
 /// ```rust, ignore
-/// use maa_rs_sys::check_return_code;
+/// use maars::check_return_code;
 ///
 /// let return_code: AsstBool = 0;
 /// let actual = check_return_code(return_code);
