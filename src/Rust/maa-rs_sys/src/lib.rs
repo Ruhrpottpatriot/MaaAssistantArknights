@@ -266,14 +266,51 @@ impl Assistant {
         // * The handle is never null at this point
         // * The string is guaranteed to be null-terminated and valid since it was
         let return_code = unsafe { AsstSetInstanceOption(self.handle, option.0, value.as_ptr()) };
-        if return_code == 1 {
-            Ok(())
-        } else {
-            Err(Error::Unknown)
+    /// Asynchronously connects to an emulator at the given address
+    ///
+    /// # Parameters
+    /// * `adb_path` - The path to the adb executable
+    /// * `address` - The address of the emulator to connect to
+    /// * `config` - The configuration to use for the connection
+    #[deprecated(
+        since = "0.1.0",
+        note = "This function is deprecated and will be removed in the next major version. Use `connect_async` instead."
+    )]
+    pub fn connect<S: Into<String>>(
+        &mut self,
+        adb_path: S,
+        address: SocketAddr,
+        config: Option<S>,
+    ) -> Result<()> {
+        if self.handle.is_null() {
+            return Err(Error::InvalidHandle);
         }
-    }
 
-    pub fn connect(&mut self, adb_path: &str, address: &str, config: Option<String>) -> Result<()> {
+        let c_adb_path = CString::new(adb_path.into())?;
+
+        let c_address = CString::new(address.to_string())?;
+        let c_cfg_ptr = match config {
+            Some(cfg) => CString::new(cfg.into())?.as_ptr(),
+            None => std::ptr::null::<c_char>(),
+        };
+
+        // Safety:
+        // * The handle is never null at this point
+        // * The strings are guaranteed to be null-terminated and valid since they were
+        //   created in safe rust with no errors.
+        let result_code = unsafe {
+            AsstConnect(
+                self.handle,
+                c_adb_path.as_ptr(),
+                c_address.as_ptr(),
+                c_cfg_ptr,
+            )
+        };
+        is_success(result_code)?;
+
+        self.target = Some(address);
+        Ok(())
+    }
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
@@ -770,5 +807,35 @@ fn path_to_bytes<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
         // but you end up with a Vec<u16> instead of a Vec<u8>, so that doesn't
         // really help.
         path.as_ref().to_str().map(|s| s.as_bytes().to_vec())
+    }
+}
+/// Tests if the return code of the backend call is "true"
+///
+/// # Parameters
+/// * `code` - The return code of the backend call
+///
+/// # Examples
+/// ```rust, ignore
+/// use maa_rs_sys::check_return_code;
+///
+/// let return_code: AsstBool = 1;
+/// let actual = check_return_code(return_code);
+///
+/// assert!(actual.is_ok());
+/// ```
+///
+/// ```rust, ignore
+/// use maa_rs_sys::check_return_code;
+///
+/// let return_code: AsstBool = 0;
+/// let actual = check_return_code(return_code);
+///     
+/// assert!(actual.is_err())
+/// ```
+fn is_success(code: AsstBool) -> Result<()> {
+    if code == 1 {
+        Ok(())
+    } else {
+        Err(Error::Unknown)
     }
 }

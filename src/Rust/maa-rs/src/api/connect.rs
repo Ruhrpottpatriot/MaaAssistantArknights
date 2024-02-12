@@ -1,3 +1,6 @@
+use std::net::SocketAddr;
+use std::str::FromStr;
+
 use crate::api::{Error, ManagerData};
 use actix_web::web::{Json, Path};
 use actix_web::{post, web, HttpResponse, Responder};
@@ -51,6 +54,10 @@ pub async fn attach(
         _ => Some(body.config.to_string()),
     };
 
-    maa.connect(&body.adb_path, &body.target, config)?;
+    let Ok(address) = SocketAddr::from_str(&body.target) else {
+        return Err(Error::InvalidRequest);
+    };
+
+    maa.connect(&body.adb_path, address, config.as_ref())?;
     Ok(HttpResponse::Ok().finish())
 }
