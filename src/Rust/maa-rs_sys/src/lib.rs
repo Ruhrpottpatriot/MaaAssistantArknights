@@ -132,6 +132,26 @@ pub struct Assistant {
     callback_ptr: Option<*mut Callback>,
 }
 
+impl Drop for Assistant {
+    fn drop(&mut self) {
+        if self.handle.is_null() {
+            return;
+        }
+
+        // Safety: The handle is never null at this point. The same goes for the callback
+        // pointer, which we want to get back from a raw pointer so it can be sasfely
+        // dropped and the memory doesn't leak.
+        #[allow(clippy::multiple_unsafe_ops_per_block)]
+        unsafe {
+            AsstDestroy(self.handle);
+
+            if let Some(callback_ptr) = self.callback_ptr {
+                let _ = Box::from_raw(callback_ptr);
+            }
+        }
+    }
+}
+
 impl Assistant {
     /// Create a new MAA assistant instance
     ///
@@ -615,26 +635,6 @@ impl Assistant {
         let i = MessageType(i);
 
         callback(i, rust_str);
-    }
-}
-
-impl Drop for Assistant {
-    fn drop(&mut self) {
-        if self.handle.is_null() {
-            return;
-        }
-
-        // Safety: The handle is never null at this point. The same goes for the callback
-        // pointer, which we want to get back from a raw pointer so it can be sasfely
-        // dropped and the memory doesn't leak.
-        #[allow(clippy::multiple_unsafe_ops_per_block)]
-        unsafe {
-            AsstDestroy(self.handle);
-
-            if let Some(callback_ptr) = self.callback_ptr {
-                let _ = Box::from_raw(callback_ptr);
-            }
-        }
     }
 }
 
