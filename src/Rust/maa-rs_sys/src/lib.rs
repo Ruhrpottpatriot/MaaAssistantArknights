@@ -26,6 +26,7 @@ use serde::Serialize;
 use std::{
     collections::{HashMap, HashSet},
     ffi::{c_char, c_void, CStr, CString, NulError},
+    net::SocketAddr,
     path::Path,
 };
 use strum::EnumString;
@@ -56,6 +57,18 @@ pub enum Error {
 
     #[error("The given contained non UTF-8 chars")]
     InvalidPath,
+
+/// Represents the id of an asynchronous call
+pub struct AsyncCallId(pub(crate) bind::AsstAsyncCallId);
+
+impl AsyncCallId {
+    /// Creates a new [`AsyncCallId`]
+    ///
+    /// # Parameters
+    /// * `id`:  The numerical id of the asynchronous call
+    pub fn new(id: i32) -> Self {
+        Self(id)
+    }
 }
 
 /// Represents the key used to identify an option value
@@ -123,7 +136,7 @@ type Callback = fn(MessageType, &str);
 pub struct Assistant {
     handle: bind::AsstHandle,
     uuid: Option<String>,
-    target: Option<String>,
+    target: Option<SocketAddr>,
     tasks: HashMap<TaskId, Task>,
 
     /// A raw pointer to the callback function presented duting construction. This field
@@ -334,14 +347,33 @@ impl Assistant {
         self.target = Some(address);
         Ok(())
     }
+
+    /// Asynchronously connects to an emulator at the given address
+    ///
+    /// # Parameters
+    /// * `adb_path` - The path to the adb executable
+    /// * `address` - The address of the emulator to connect to
+    /// * `config` - The configuration to use for the connection
+    /// * `block` - If true, the function will block until the connection is established
+    ///
+    /// # Returns
+    /// An [`AsyncCallId`] that can be used to identify the asynchronous call
+    pub fn connect_async<S: Into<String>>(
+        &mut self,
+        adb_path: S,
+        address: SocketAddr,
+        config: Option<S>,
+        block: bool,
+    ) -> Result<AsyncCallId> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
 
-        let c_adb_path = CString::new(adb_path)?;
-        let c_address = CString::new(address)?;
+        let c_adb_path = CString::new(adb_path.into())?;
+
+        let c_address = CString::new(address.to_string())?;
         let c_cfg_ptr = match config {
-            Some(cfg) => CString::new(cfg)?.as_ptr(),
+            Some(cfg) => CString::new(cfg.into())?.as_ptr(),
             None => std::ptr::null::<c_char>(),
         };
 
@@ -349,22 +381,18 @@ impl Assistant {
         // * The handle is never null at this point
         // * The strings are guaranteed to be null-terminated and valid since they were
         //   created in safe rust with no errors.
-        let return_code = unsafe {
+        let async_call_id = unsafe {
             AsstAsyncConnect(
                 self.handle,
                 c_adb_path.as_ptr(),
                 c_address.as_ptr(),
                 c_cfg_ptr,
-                // Question: The line below makes the code blocking. Is this intended?
-                1,
+                block.into(),
             )
         };
-        if return_code != 0 {
-            self.target = Some(address.to_string());
-            Ok(())
-        } else {
-            Err(Error::Unknown)
-        }
+        self.target = Some(address);
+        Ok(AsyncCallId(async_call_id))
+    }
     }
 
     /// Check if an instance of MAA is running
