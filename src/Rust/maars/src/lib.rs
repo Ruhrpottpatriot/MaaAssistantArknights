@@ -57,6 +57,9 @@ pub enum Error {
 
     #[error("Could not serialize object to JSON")]
     Serialize(#[from] serde_json::Error),
+
+    #[error("Could not append task")]
+    AppendTask,
 }
 
 /// Represents the id of an asynchronous call
@@ -541,17 +544,21 @@ impl Assistant {
         // Safety: The handle is never null at this point and the strings are guaranteed
         // to be valid and null-terminated
         let task_id = unsafe { AsstAppendTask(self.handle, type_, params) };
-        let task_id = TaskId(task_id);
+        if task_id == 0 {
+            return Err(Error::AppendTask);
+        }
+
+        let id = TaskId(task_id);
         self.tasks.insert(
-            task_id,
+            id,
             Task {
-                id: task_id,
-                task_type: task_type,
+                id,
+                task_type,
                 params: params_json.to_string(),
             },
         );
 
-        Ok(task_id)
+        Ok(id)
     }
 
     /// Sets the parameters for a task
