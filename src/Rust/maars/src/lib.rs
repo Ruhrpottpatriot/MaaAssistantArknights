@@ -1,22 +1,4 @@
-//! maa-rs_sy is the main crate the provides rust bindings to the exported interface
-//! provided by MAA. It aims to give users an _unsafe-free_ api they can use in their
-//! Rust applications.
-//!
-//! This create also contains wrappers around most types to make them secure and add
-//! more features to them that are interesting to Rust users, e.g. numerical id's, such
-//! as being equatable, comparable and cloneable, which the original FFI type might not
-//! be.
-//!
-//! This crate differs from the maa-sys crate found in the maa-cli project. That crate
-//! still exposes some FFI types to the user, which this crate deliberately avoids.
-//! However, the above mentioned maa-sys crate uses
-//! [libloading](https://docs.rs/libloading/latest/libloading/index.html) to load the
-//! MAA library. Libloading would allow a dynamic loading of the core MAA library
-//! without having to know the exact path of the library files.
-//! This might be a suitable approach compared to the manual linking of this library
-//! against the C/C++ MAA library.
-//! Furthermore, there are some bugs and incorrect choices in the library, most notably
-//! around paths on windows.
+#![doc = include_str!("../README.md")]
 
 #![warn(
     clippy::missing_safety_doc,
