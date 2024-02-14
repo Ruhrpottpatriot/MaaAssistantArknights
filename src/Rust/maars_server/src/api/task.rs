@@ -6,7 +6,7 @@ use actix_web::{
     web::{self, Json, Path},
     HttpResponse, Responder,
 };
-use maars::TaskId;
+use maars::types::TaskId;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{collections::HashMap, sync::Mutex};
@@ -39,7 +39,7 @@ pub async fn all(id: Path<i64>, manager: ManagerData) -> Result<impl Responder, 
             tmp.insert(
                 k.to_string(),
                 json!({
-                    "type": v.task_type,
+                    "type": v.to_string(),
                     "params": v.params
                 }),
             );

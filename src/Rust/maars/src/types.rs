@@ -2,7 +2,11 @@
 //! faithfully represent and expand on the documentation in the original C/C++ code, it is
 //! nonetheless a copy. In case the two contradict, the [original comments](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/dev/src/MaaCore/Common/AsstTypes.h) take precedence.
 
+use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
+
+mod task;
+pub use task::*;
 
 /// Enumerates the possible process-wide options for the assistant
 ///
@@ -55,4 +59,13 @@ pub enum TouchMode {
 
     #[strum(serialize = "MacPlayTools")]
     MacPlayTools,
+}
+
+/// enumerates the possible direction an operator can face on the map
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, Display, Serialize, Deserialize)]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
 }

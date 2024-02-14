@@ -14,8 +14,8 @@
 pub(crate) mod bind;
 use bind::*;
 
-mod types;
-use types::*;
+pub mod types;
+pub use types::*;
 
 use derive_more::Display;
 use serde::Serialize;
@@ -94,33 +94,6 @@ impl MessageType {
     pub fn to_be_bytes(&self) -> [u8; 4] {
         self.0.to_be_bytes()
     }
-}
-
-/// Represents the ID of a task.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Display, Serialize)]
-#[repr(transparent)]
-pub struct TaskId(pub(crate) bind::AsstTaskId);
-
-impl TaskId {
-    /// Creates a new [`TaskId`]
-    ///
-    /// # Parameters
-    /// * `id`:  The numerical id of the task
-    pub fn new(id: i32) -> Self {
-        Self(id)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Task {
-    pub id: TaskId,
-
-    /// The type of the task
-    /// TODO: Convert the task type to a Rust enum
-    pub task_type: String,
-
-    /// The parameters for the task, serialized as a JSON string
-    pub params: String,
 }
 
 /// The callback function that is called every time a message occurs in the backend
@@ -522,24 +495,24 @@ impl Assistant {
     /// # Parameters
     /// * `task_type` - The type of the task to create
     /// * `params` - The parameters for the task
-    pub fn create_task<S: Into<String>, T: Serialize>(
+    pub fn create_task(
         &mut self,
-        task_type: S,
-        params: &T,
+        task: Task,
     ) -> Result<TaskId> {
         if self.handle.is_null() {
             return Err(Error::InvalidHandle);
         }
 
-        let task_type = task_type.into();
+        // Calling ´to_string` on the `Task` enum returns a the name of the variant only.
+        let task_type = task.to_string();
+        let type_ = CString::new(task_type)?.as_ptr();
 
-        let type_ = CString::new(task_type.clone())?.as_ptr();
-        let params_json = serde_json::to_string(params)?;
+        let json_data = serde_json::to_string(&task)?;
 
         // TODO: Find a better way than stupidly cloning the string
         // If the AsstAppendTask function doesn't take ownership of the string, then we
         // can get the original string back from it
-        let params = CString::new(params_json.clone())?.as_ptr();
+        let params = CString::new(json_data)?.as_ptr();
 
         // Safety: The handle is never null at this point and the strings are guaranteed
         // to be valid and null-terminated
@@ -551,11 +524,7 @@ impl Assistant {
         let id = TaskId(task_id);
         self.tasks.insert(
             id,
-            Task {
-                id,
-                task_type,
-                params: params_json.to_string(),
-            },
+            task,
         );
 
         Ok(id)
