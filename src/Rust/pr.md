@@ -1,0 +1,13 @@
+## Summary
+
+This pull request makes some substantial changes to the Rust codebase with the intention to make it more user friendly. This was done by hiding most of the unsafe code behind proper abstractions, as well as converting types that can easily be misused by accident. Users should not have to deal with `unsafe` code, unless absolutely necessary and they also shouldn't have to worry about if their data is properly formatted. The Rust compiler can take (most) of the burden off the user and check many preconditions and invariants during compile time by leveraging the entire type system
+
+**Note:** The content of this PR will be constantly updated until it is ready to merge. Detailed explanations on the _why_ and possible alternatives to the chosen approach can be found in the commit messages.
+
+## Core changes
+
+* Splitting the crate into two: Currently the rust code combines a webserver and the FFI bindings in a single crate. However, it's much better when the FFI bindings are refactored out, since now users that don't need or want a heavy handed server, e.g. the [MAA-CLI](https://github.com/MaaAssistantArknights/maa-cli) crate, can now import just the bindings.
+* Choosing a name for the FFI bindings crate and Rust code: Since the Rust code is so deeply placed in the MAA core repository there was never a need for an easy to remember and recognizable name, so the server is currently just named "maa-server" and the cli is named "maa-cli". However, this misses out on the wordplay with the planet Mars. Therefore this PR renames the crates to _maars_ for the FFI crate and _maars-server_ for the server crate. It's also a nice reference to the _Lone Trail_ event.
+
+* Removal of `unsafe` functions from the public API: This mainly concerns the message callbacks, which needed to be unsafe to be passed over FFI boundaries. This is not necessary any more as the callback function is passed to an internal trampoline. This has the added benefit that now every function with the correct signature is a valid callback function; including closures!
+* Replacement of typedefs with newtypes: While typedefs have their place in improving code-readability, they also have the drawback that they are just renaming types. This makes it possible to pass types that seem unrelated to functions where they don't belong. For example, nothing prevented the user from passing an `AsstTaskId` to a function expecting an `AsstMsgId`. By replacing all typedefs in function signatures and variable declarations with newtype structs, this becomes impossible as the compiler will check for the correct type. This also isn't a performance regression as the compiler will just replace the value of the newtype with the inner type.
